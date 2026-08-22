@@ -1,0 +1,20 @@
+{
+  "name": "@norn/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Norn reviewer application.",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "main.js",
+  "engines": {
+    "node": ">=22.17"
+  },
+  "scripts": {
+    "dev": "electron .",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "playwright": "^1.62.1"
+  }
+}
