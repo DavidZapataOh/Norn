@@ -1,0 +1,138 @@
+/* The plate reserves margin on both sides so annotation labels sit outside the
+   sheet, the way a specimen sheet carries its callouts in the margin. */
+.plate {
+  position: relative;
+  margin: 0;
+  width: 100%;
+  padding-inline: 0;
+}
+@media (min-width: 1100px) { .plate { padding-inline: 84px; } }
+
+.sheet {
+  position: relative;
+  background: #fdfcfa;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-plate);
+  box-shadow: var(--shadow-plate);
+  overflow: hidden;
+  transform: rotate(-1.1deg);
+}
+/* The uneven lighting of the original capture. */
+.sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(102deg, rgba(20, 22, 26, 0.075), rgba(20, 22, 26, 0) 48%);
+}
+
+.page {
+  position: relative;
+  width: 100%;
+  container-type: inline-size;
+  user-select: none;
+}
+
+/* Each recognised string, placed where it was found. */
+.tx {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  color: #2b2f35;
+  line-height: 1;
+  letter-spacing: -0.005em;
+}
+.lg { font-weight: 640; color: #16191d; }
+.hd { font-weight: 640; color: #1d2126; }
+.sm { font-weight: 430; }
+
+/* Marks live in their own layer, untransformed, so labels can leave the sheet. */
+.marks { position: absolute; inset: 0; padding-inline: inherit; pointer-events: none; }
+@media (min-width: 1100px) { .marks { padding-inline: 84px; } }
+.marksInner { position: relative; width: 100%; transform: rotate(-1.1deg); }
+
+.mark { position: absolute; }
+.ok { color: var(--verified); }
+.abstained { color: var(--abstained); }
+
+.box {
+  position: absolute;
+  inset: -4px -6px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 380ms var(--ease-out), transform 380ms var(--ease-out);
+}
+.isShown .box { opacity: 1; transform: none; }
+
+/* Drawn with scaleX rather than width: growing width would relayout on every frame. */
+.leader {
+  position: absolute;
+  top: 50%;
+  height: 1px;
+  width: 22px;
+  background: currentColor;
+  opacity: 0.4;
+  transform: scaleX(0);
+  transition: transform 320ms var(--ease-out) 160ms;
+}
+.sideRight .leader { left: calc(100% + 6px); transform-origin: left center; }
+.sideLeft  .leader { right: calc(100% + 6px); transform-origin: right center; }
+.isShown .leader { transform: scaleX(1); }
+
+.label {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-chip);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(20, 22, 26, 0.09);
+  opacity: 0;
+  transform: translateY(-50%) translateX(var(--slide));
+  transition: opacity 320ms var(--ease-out) 200ms, transform 320ms var(--ease-out) 200ms;
+}
+.sideRight .label { left: calc(100% + 34px); --slide: -6px; }
+.sideLeft  .label { right: calc(100% + 34px); --slide: 6px; }
+.isShown .label { opacity: 1; --slide: 0px; }
+
+.field { color: var(--ink); font-weight: 500; }
+.conf { color: currentColor; font-variant-numeric: tabular-nums; }
+
+.caption {
+  margin-top: var(--space-6);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--ink-faint);
+  max-width: 52ch;
+}
+
+/* Below the margin breakpoint the labels have nowhere to sit, so they tuck
+   against the box and the leader retracts. */
+@media (max-width: 1099px) {
+  .sideRight .label, .sideLeft .label {
+    left: auto; right: auto;
+    top: auto; bottom: calc(100% + 6px);
+    transform: translateX(0) translateY(var(--slide, 4px));
+  }
+  .sideRight .label { right: 0; left: auto; }
+  .sideLeft  .label { left: 0; right: auto; }
+  .isShown .label { --slide: 0px; }
+  .leader { display: none; }
+}
+/* Rows that sit close together stack their callouts once the margin is gone, so
+   below this width the boxes carry the marking alone and the field list beneath
+   the plate carries the names and confidences. */
+@media (max-width: 899px) {
+  .label, .leader { display: none; }
+}

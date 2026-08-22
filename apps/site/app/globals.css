@@ -1,0 +1,131 @@
+/* Design tokens. Authority: DESIGN.md */
+
+:root {
+  --paper: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunk: #f4f2ee;
+  --ink: #14161a;
+  --ink-muted: #5c6470;
+  --ink-faint: #686f7a;
+  --rule: #e7e4df;
+  --rule-strong: #d6d2cb;
+
+  --accent: #1b3a5c;
+  --accent-hover: #24507c;
+  --accent-wash: #eef2f6;
+
+  --verified: #2f6f4e;
+  --abstained: #9a6316;
+  --mismatch: #a83b2e;
+
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-6: 24px;  --space-8: 32px;  --space-12: 48px; --space-16: 64px;
+  --space-24: 96px; --space-32: 128px; --space-40: 160px;
+
+  --radius-chip: 2px;
+  --radius-control: 6px;
+  --radius-card: 12px;
+  --radius-plate: 20px;
+
+  --step--1: clamp(0.8125rem, 0.79rem + 0.11vw, 0.875rem);
+  --step-0:  clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1:  clamp(1.125rem, 1.07rem + 0.28vw, 1.3125rem);
+  --step-2:  clamp(1.3125rem, 1.21rem + 0.52vw, 1.625rem);
+  --step-3:  clamp(1.625rem, 1.44rem + 0.92vw, 2.125rem);
+  --step-4:  clamp(2rem, 1.66rem + 1.7vw, 2.875rem);
+  --step-5:  clamp(2.5rem, 1.9rem + 3vw, 3.875rem);
+  --step-6:  clamp(2.75rem, 2.1rem + 3.4vw, 4.5rem);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-plate: 0 1px 2px rgba(20, 22, 26, 0.04), 0 12px 32px -12px rgba(20, 22, 26, 0.12);
+  --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.03), 0 6px 16px -10px rgba(20, 22, 26, 0.1);
+
+  --measure: 68ch;
+  --container: 1200px;
+
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: var(--step-0);
+  line-height: 1.6;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  text-wrap: balance;
+  margin: 0;
+}
+
+p { text-wrap: pretty; margin: 0; }
+
+/* Anything the system measured is set in the machine voice. */
+.mono, code, kbd {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 1;
+}
+
+/* Browser surfaces the design still owns. */
+::selection { background: var(--accent-wash); color: var(--ink); }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-chip);
+}
+* { caret-color: var(--accent); }
+@supports (scrollbar-color: auto) {
+  html { scrollbar-color: var(--rule-strong) var(--paper); scrollbar-width: thin; }
+}
+a {
+  color: inherit;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color 160ms var(--ease-out);
+}
+a:hover { text-decoration-color: var(--accent); }
+
+.container {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--space-6);
+}
+@media (min-width: 768px) { .container { padding-inline: var(--space-12); } }
+
+.section { padding-block: clamp(var(--space-16), 9vw, var(--space-32)); }
+
+/* Content is visible by default and the script opts into animating it. Starting
+   hidden would mean a failed or slow script leaves the page blank. */
+:root.js-reveal [data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 620ms var(--ease-out), transform 620ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+:root.js-reveal [data-reveal].is-revealed { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  :root.js-reveal [data-reveal] { opacity: 1; transform: none; }
+}
