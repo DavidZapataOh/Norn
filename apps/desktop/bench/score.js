@@ -1,27 +1,12 @@
 "use strict";
 
-// Amount parsing lives here for now and moves to lib/money.js when that module
-// lands, at which point this file imports rather than duplicates it.
-const CURRENCY = /\b(ARS|USD|USDT|EUR|BRL|CLP|COP|MXN|PEN|UYU|GBP)\b/i;
+const { parseAmount: parseMoney, formatMinor } = require("../lib/money");
 
+// The scorer compares against fixture values written as JSON numbers, so it works in
+// Number while the pipeline works in minor units. One parser decides what an amount is.
 function parseAmount(raw) {
-  if (typeof raw !== "string") return null;
-  let body = raw.replace(CURRENCY, "").replace(/[$€£]/g, "").replace(/^\s*-/, "").replace(/\s/g, "");
-  if (!/^[\d.,]+$/.test(body) || !/\d/.test(body)) return null;
-
-  const lastDot = body.lastIndexOf(".");
-  const lastComma = body.lastIndexOf(",");
-  if (lastDot === -1 && lastComma === -1) return Number(body);
-
-  const sep = Math.max(lastDot, lastComma);
-  const tail = body.slice(sep + 1);
-  // A separator followed by exactly three digits, with no second separator, is a
-  // thousands mark: 2.340 is two thousand three hundred forty, not 2.34.
-  if (tail.length === 3 && (lastDot === -1 || lastComma === -1)) {
-    return Number(body.replace(/[.,]/g, ""));
-  }
-  if (!/^\d{1,2}$/.test(tail)) return null;
-  return Number(`${body.slice(0, sep).replace(/[.,]/g, "")}.${tail}`);
+  const parsed = parseMoney(raw);
+  return parsed === null ? null : Number(formatMinor(parsed.minor));
 }
 
 // A model may return an amount as a number or as a string in either decimal

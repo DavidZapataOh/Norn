@@ -75,3 +75,18 @@ test("scoreCorpus aggregates per field", () => {
   assert.equal(corpus.byField.a.correct, 1);
   assert.equal(corpus.byField.b.correct, 1);
 });
+
+test("the scorer and the pipeline agree on every amount", () => {
+  const { parseAmount: parseMoney, formatMinor } = require("../lib/money");
+  const { parseAmount: parseScore } = require("../bench/score");
+  const cases = [
+    "2.831,40", "2,831.40", "2.340", "0,05", "1.234.567", "ARS 2.831,40",
+    "ARS2.831,40", "USDT 5,00", "CHF 12.50", ":%2 VAI", "Jund", "30-71234567-9",
+  ];
+
+  for (const raw of cases) {
+    const viaMoney = parseMoney(raw);
+    const expected = viaMoney === null ? null : Number(formatMinor(viaMoney.minor));
+    assert.equal(parseScore(raw), expected, `disagreement on ${JSON.stringify(raw)}`);
+  }
+});
