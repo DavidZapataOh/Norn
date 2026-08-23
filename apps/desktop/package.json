@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@qvac/sdk": "0.17.1",
-    "pdf-parse": "1.1.4"
+    "pdf-parse": "1.1.4",
+    "pdfjs-dist": "5.4.149"
   }
 }

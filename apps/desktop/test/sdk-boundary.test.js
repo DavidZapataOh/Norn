@@ -3,20 +3,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-
-const APP_DIR = path.join(__dirname, "..");
-const SKIP_DIRS = new Set(["node_modules", "test", "renderer", ".git"]);
-
-function sourceFiles(dir, found = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (!SKIP_DIRS.has(entry.name)) sourceFiles(path.join(dir, entry.name), found);
-    } else if (entry.name.endsWith(".js")) {
-      found.push(path.join(dir, entry.name));
-    }
-  }
-  return found;
-}
+const { filesMatching, APP_DIR } = require("./helpers/sources");
 
 // Matches the ways a module can actually reach the package, rather than any mention
 // of its name: a user-facing message that quotes the package is not a second door.
@@ -24,11 +11,7 @@ function sourceFiles(dir, found = []) {
 // guards against drift, not an adversary.
 const REACHES_SDK = /(?:require|import)\s*\(\s*["']@qvac\/sdk["']\s*\)|from\s+["']@qvac\/sdk["']/;
 
-function filesNamingTheSdk() {
-  return sourceFiles(APP_DIR)
-    .filter((file) => REACHES_SDK.test(fs.readFileSync(file, "utf8")))
-    .map((file) => path.relative(APP_DIR, file));
-}
+const filesNamingTheSdk = () => filesMatching(REACHES_SDK);
 
 test("exactly one module reaches the SDK", () => {
   assert.deepEqual(filesNamingTheSdk(), ["lib/sdk.js"]);

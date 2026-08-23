@@ -64,7 +64,10 @@ test("the bridge exposes nothing beyond its declared surface", async () => {
 test("a second instance exits immediately", async () => {
   const session = await launchApp();
   try {
-    const second = spawn(electronPath, [APP_DIR], { stdio: "ignore" });
+    // Same user data directory, or the two processes take two different locks and the
+    // second one has nothing to collide with.
+    const second = spawn(electronPath, [APP_DIR, `--user-data-dir=${session.userDataDir}`],
+      { stdio: "ignore" });
     const code = await new Promise((resolve) => {
       const timer = setTimeout(() => { second.kill(); resolve("timeout"); }, 15000);
       second.on("exit", (c) => { clearTimeout(timer); resolve(c); });
