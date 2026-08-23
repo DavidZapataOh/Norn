@@ -24,7 +24,10 @@ function hGap(a, b) {
 }
 
 const DECIMAL_TAIL = /[.,]\s*$/;
-const SHORT_DIGITS = /^\d{1,2}$/;
+// Either half of a decimal ("491," + "40") or the rest of a number split at its thousands
+// mark ("3." + "014,30"). Four unseparated digits is a value in its own right, not a
+// continuation, which is what keeps a label from swallowing the next column.
+const CONTINUATION = /^\d{1,2}$|^\d{3}(?:[.,]\d{1,2})?$/;
 
 // The recogniser returns regions in its own order, not the page's. Sorting first is what
 // makes "the previous region" mean the one to the left rather than whichever came back
@@ -43,7 +46,7 @@ function joinSplitNumbers(regions) {
     const prev = out[out.length - 1];
     const joinable =
       prev && Array.isArray(prev.bbox) && Array.isArray(region.bbox) &&
-      DECIMAL_TAIL.test(prev.text) && SHORT_DIGITS.test(region.text.trim()) &&
+      DECIMAL_TAIL.test(prev.text) && CONTINUATION.test(region.text.trim()) &&
       vOverlap(prev.bbox, region.bbox) > 0.5 &&
       hGap(prev.bbox, region.bbox) < 0.6;
 

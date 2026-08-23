@@ -131,3 +131,17 @@ test("a fragment scattered in the region list is still rejoined", () => {
   assert.equal(out.length, 2);
   assert.ok(out.some((r) => r.text === "491,40"), "the fragment was missed because of list order");
 });
+
+test("a numeral split at its thousands separator is rejoined", () => {
+  // Verbatim from a recognition pass over a skewed photograph: the total 3.014,30 came
+  // back as two regions. The decimal-split pattern alone does not cover this, and the
+  // field it costs is the total.
+  const out = joinSplitNumbers([
+    { text: "3.", bbox: [316, 601, 339, 621], confidence: 0.919 },
+    { text: "014,30", bbox: [331, 596, 405, 626], confidence: 0.998 },
+  ]);
+
+  assert.equal(out.length, 1);
+  assert.equal(out[0].text, "3.014,30");
+  assert.equal(out[0].confidence, 0.919, "a repair must not raise confidence");
+});

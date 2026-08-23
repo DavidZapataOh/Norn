@@ -1,0 +1,539 @@
+{
+  "digital-continental.pdf": {
+    "classes": [
+      "digital",
+      "continental"
+    ],
+    "mode": "pdf",
+    "page_text": "INVOICE Northwind Paper Supply SL Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. NW-2026-0117 Issue date: 14 March 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   327,90 Card stock A3           12    6,75    105,00 Subtotal                             432,90 VAT 21%                               90,91 Total due                            523,81 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Northwind Paper Supply SL",
+        "bbox": [
+          112.0,
+          183.0,
+          375.4,
+          202.2
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "NW-2026-0117",
+        "bbox": [
+          214.3,
+          297.0,
+          349.9,
+          316.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "14 March 2026",
+        "bbox": [
+          215.4,
+          335.0,
+          348.8,
+          354.2
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "90,91",
+        "bbox": [
+          368.8,
+          639.0,
+          418.9,
+          658.2
+        ]
+      },
+      {
+        "field": "total",
+        "text": "523,81",
+        "bbox": [
+          356.6,
+          677.0,
+          417.7,
+          696.2
+        ]
+      }
+    ]
+  },
+  "digital-anglo.pdf": {
+    "classes": [
+      "digital",
+      "anglo"
+    ],
+    "mode": "pdf",
+    "page_text": "INVOICE Harborlight Trading Ltd Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. HL-2026-4471 Issue date: 02 April 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   327,90 Card stock A3           12    6,75    105,00 Subtotal                             432,90 VAT 21%                               90,91 Total due                            523,81 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Harborlight Trading Ltd",
+        "bbox": [
+          112.0,
+          183.0,
+          335.3,
+          202.2
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "HL-2026-4471",
+        "bbox": [
+          214.3,
+          297.0,
+          342.1,
+          316.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "02 April 2026",
+        "bbox": [
+          215.4,
+          335.0,
+          333.2,
+          354.2
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "90,91",
+        "bbox": [
+          368.8,
+          639.0,
+          418.9,
+          658.2
+        ]
+      },
+      {
+        "field": "total",
+        "text": "523,81",
+        "bbox": [
+          356.6,
+          677.0,
+          417.7,
+          696.2
+        ]
+      }
+    ]
+  },
+  "digital-wrong-total.pdf": {
+    "classes": [
+      "digital",
+      "arithmetic-wrong"
+    ],
+    "mode": "pdf",
+    "page_text": "INVOICE Verdant Office Group Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. VO-2026-0088 Issue date: 19 April 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   327,90 Card stock A3           12    6,75    105,00 Subtotal                             432,90 VAT 21%                               90,91 Total due                            612,00 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Verdant Office Group",
+        "bbox": [
+          112.0,
+          183.0,
+          314.3,
+          202.2
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "VO-2026-0088",
+        "bbox": [
+          214.3,
+          297.0,
+          345.5,
+          316.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "19 April 2026",
+        "bbox": [
+          215.4,
+          335.0,
+          333.2,
+          354.2
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "90,91",
+        "bbox": [
+          368.8,
+          639.0,
+          418.9,
+          658.2
+        ]
+      },
+      {
+        "field": "total",
+        "text": "612,00",
+        "bbox": [
+          356.6,
+          677.0,
+          417.7,
+          696.2
+        ]
+      }
+    ]
+  },
+  "digital-absent-vat.pdf": {
+    "classes": [
+      "digital",
+      "absent-field"
+    ],
+    "mode": "pdf",
+    "page_text": "INVOICE Kestrel Print Works Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. KP-2026-0231 Issue date: 27 April 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   327,90 Card stock A3           12    6,75    105,00 Subtotal                             432,90 Total due                            432,90 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Kestrel Print Works",
+        "bbox": [
+          112.0,
+          183.0,
+          297.6,
+          202.2
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "KP-2026-0231",
+        "bbox": [
+          214.3,
+          297.0,
+          343.2,
+          316.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "27 April 2026",
+        "bbox": [
+          215.4,
+          335.0,
+          333.2,
+          354.2
+        ]
+      },
+      {
+        "field": "total",
+        "text": "432,90",
+        "bbox": [
+          356.6,
+          639.0,
+          417.7,
+          658.2
+        ]
+      }
+    ]
+  },
+  "scan-continental.pdf": {
+    "classes": [
+      "scan",
+      "continental"
+    ],
+    "mode": "scan",
+    "page_text": "INVOICE Solent Paper Company Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. SP-2026-1902 Issue date: 05 May 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   1.079,00 Card stock A3           12    6,75    105,00 Subtotal                             1.184,00 VAT 21%                               248,64 Total due                            1.432,64 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Solent Paper Company",
+        "bbox": [
+          51.4,
+          121.1,
+          280.0,
+          144.6
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "SP-2026-1902",
+        "bbox": [
+          159.0,
+          224.6,
+          293.6,
+          247.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "05 May 2026",
+        "bbox": [
+          160.3,
+          259.4,
+          280.5,
+          281.8
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "248,64",
+        "bbox": [
+          323.4,
+          534.7,
+          387.1,
+          556.5
+        ]
+      },
+      {
+        "field": "total",
+        "text": "1.432,64",
+        "bbox": [
+          308.4,
+          569.3,
+          389.4,
+          591.3
+        ]
+      }
+    ]
+  },
+  "scan-anglo.pdf": {
+    "classes": [
+      "scan",
+      "anglo"
+    ],
+    "mode": "scan",
+    "page_text": "INVOICE Ridgeway Supplies Inc Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. RW-2026-3310 Issue date: 11 May 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   1,079,00 Card stock A3           12    6,75    105,00 Subtotal                             1,184,00 VAT 21%                               248,64 Total due                            1,432,64 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Ridgeway Supplies Inc",
+        "bbox": [
+          51.4,
+          121.2,
+          276.2,
+          144.6
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "RW-2026-3310",
+        "bbox": [
+          159.0,
+          224.5,
+          300.3,
+          247.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "11 May 2026",
+        "bbox": [
+          160.3,
+          259.4,
+          280.5,
+          281.8
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "248,64",
+        "bbox": [
+          323.4,
+          534.7,
+          387.1,
+          556.5
+        ]
+      },
+      {
+        "field": "total",
+        "text": "1,432,64",
+        "bbox": [
+          308.4,
+          569.3,
+          389.4,
+          591.3
+        ]
+      }
+    ]
+  },
+  "photo-skewed.png": {
+    "classes": [
+      "photo",
+      "continental"
+    ],
+    "mode": "photo",
+    "page_text": "INVOICE Lanternfield Stationers Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. LF-2026-0771 Issue date: 18 May 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   2.386,16 Card stock A3           12    6,75    105,00 Subtotal                             2.491,16 VAT 21%                               523,14 Total due                            3.014,30 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Lanternfield Stationers",
+        "bbox": [
+          34.2,
+          133.1,
+          269.9,
+          165.0
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "LF-2026-0771",
+        "bbox": [
+          149.6,
+          240.6,
+          285.4,
+          268.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "18 May 2026",
+        "bbox": [
+          152.1,
+          276.9,
+          277.9,
+          304.1
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "523,14",
+        "bbox": [
+          331.0,
+          560.1,
+          397.8,
+          584.9
+        ]
+      },
+      {
+        "field": "total",
+        "text": "3.014,30",
+        "bbox": [
+          316.5,
+          596.0,
+          401.4,
+          621.5
+        ]
+      }
+    ]
+  },
+  "photo-fragmented.png": {
+    "classes": [
+      "photo",
+      "fragmented"
+    ],
+    "mode": "photo",
+    "page_text": "INVOICE Ashgrove Paper Mill Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. AG-2026-0654 Issue date: 23 May 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   1.354,00 Card stock A3           12    6,75    105,00 Subtotal                             1.459,00 VAT 21%                               306,39 Total due                            1.765,39 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Ashgrove Paper Mill",
+        "bbox": [
+          34.2,
+          134.2,
+          243.9,
+          165.0
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "AG-2026-0654",
+        "bbox": [
+          149.6,
+          240.3,
+          292.4,
+          268.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "23 May 2026",
+        "bbox": [
+          152.1,
+          276.9,
+          277.9,
+          304.1
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "306,39",
+        "bbox": [
+          331.0,
+          560.1,
+          397.8,
+          584.9
+        ]
+      },
+      {
+        "field": "total",
+        "text": "1.765,39",
+        "bbox": [
+          316.5,
+          596.0,
+          401.4,
+          621.5
+        ]
+      }
+    ]
+  },
+  "photo-anglo.png": {
+    "classes": [
+      "photo",
+      "anglo"
+    ],
+    "mode": "photo",
+    "page_text": "INVOICE Cobblestone Office Ltd Calle Mayor 14, 28013 Madrid VAT ID: ES-X0000000X (fake) Invoice no. CS-2026-8123 Issue date: 29 May 2026 Bill to: Acme Robotics GmbH (fake) Description            Qty      Unit       Amount Copier paper A4         40    8,20   2,386,16 Card stock A3           12    6,75    105,00 Subtotal                             2,491,16 VAT 21%                               523,14 Total due                            3,014,30 Payment to IBAN ES00 0000 0000 0000 (fake)",
+    "fields": [
+      {
+        "field": "vendor",
+        "text": "Cobblestone Office Ltd",
+        "bbox": [
+          34.2,
+          133.1,
+          270.9,
+          165.0
+        ]
+      },
+      {
+        "field": "invoice_no",
+        "text": "CS-2026-8123",
+        "bbox": [
+          149.6,
+          240.3,
+          291.4,
+          268.2
+        ]
+      },
+      {
+        "field": "date",
+        "text": "29 May 2026",
+        "bbox": [
+          152.1,
+          276.9,
+          277.9,
+          304.1
+        ]
+      },
+      {
+        "field": "vat",
+        "text": "523,14",
+        "bbox": [
+          331.0,
+          560.1,
+          397.8,
+          584.9
+        ]
+      },
+      {
+        "field": "total",
+        "text": "3,014,30",
+        "bbox": [
+          316.5,
+          596.0,
+          401.4,
+          621.5
+        ]
+      }
+    ]
+  },
+  "notes.txt": {
+    "classes": [
+      "non-document"
+    ],
+    "mode": "skip",
+    "fields": []
+  }
+}
