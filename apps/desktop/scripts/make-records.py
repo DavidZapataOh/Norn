@@ -5,6 +5,7 @@ byte order mark and the CRLF line endings, because that is what the importer is 
 to survive. Run: python3 scripts/make-records.py
 """
 
+import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +39,96 @@ def write(name, text, encoding="utf-8"):
     with open(path, "wb") as fh:
         fh.write(text.encode(encoding))
     return os.path.getsize(path)
+
+
+# One record per corpus document, with the amount derived from the corpus's own ground truth
+# rather than typed a second time: a change to a document must not silently turn an exact
+# match into a one-cent mismatch. The deviation is then applied to that derived value.
+DEVIATIONS = {
+    "digital-continental.pdf": ("exact", 0, "matched",
+                                "the record is the amount the document prints"),
+    "digital-anglo.pdf": ("two cents under, inside tolerance", -2, "matched",
+                          "two minor units is inside the stated tolerance"),
+    "scan-continental.pdf": ("one euro under", -100, "mismatch",
+                             "one euro under, well outside tolerance"),
+    "photo-skewed.png": ("ten times the amount", "x10", "mismatch",
+                         "a wrong magnitude, the failure that looks most plausible"),
+    "photo-anglo.png": ("different currency", "currency", "mismatch",
+                        "a different currency is a hard stop and nothing converts"),
+    "scan-anglo.pdf": ("inactive vendor", "inactive", "mismatch",
+                       "the vendor is marked inactive"),
+    "photo-fragmented.png": ("no record at all", None, "no-candidate",
+                             "no record was imported for this document"),
+    "digital-wrong-total.pdf": ("arithmetic already wrong", 0, "indeterminate",
+                                "the gate withheld the amount, so it cannot be compared"),
+}
+
+# A currency the corpus never uses, so the mismatch cannot pass by coincidence.
+OTHER_CURRENCY = "USD"
+
+
+def parse_minor(text):
+    """The corpus prints an amount in one of two conventions. This is the same rule the
+    application's parser applies, kept here because a fixture generator that imported the
+    application would be checking the application against itself."""
+    body = text.strip().split()[-1]
+    if "," in body and "." in body:
+        decimal = "," if body.rindex(",") > body.rindex(".") else "."
+    else:
+        decimal = "," if "," in body and len(body.split(",")[-1]) <= 2 else "."
+    units, _, cents = body.rpartition(decimal)
+    units = units.replace(".", "").replace(",", "") or "0"
+    return int(units) * 100 + int(cents or 0)
+
+
+def write_reconcile_set():
+    corpus = os.path.join(HERE, "..", "fixtures", "corpus", "truth.json")
+    with open(corpus, encoding="utf-8") as fh:
+        truth = json.load(fh)
+
+    lines = ["reference;vendor;amount;currency;date"]
+    expected = {}
+
+    for name, (label, deviation, verdict, why) in DEVIATIONS.items():
+        fields = {f["field"]: f for f in truth[name]["fields"]}
+        minor = parse_minor(fields["total"]["text"])
+        currency = fields["currency"]["text"]
+        vendor = fields["vendor"]["text"]
+        reference = fields["invoice_no"]["text"]
+
+        expected[name] = {"verdict": verdict, "why": why, "deviation": label}
+        if deviation == "inactive":
+            # Marked in the store rather than encoded in the name: a renamed vendor still
+            # matches by reference and is never actually inactive, so the check under test
+            # would never run.
+            expected[name]["deactivateVendor"] = vendor
+
+        if deviation is None:
+            continue   # no record at all, on purpose
+        if deviation == "x10":
+            minor *= 10
+        elif deviation == "currency":
+            currency = OTHER_CURRENCY
+        elif deviation == "inactive":
+            pass
+        else:
+            minor += deviation
+
+        units, cents = divmod(minor, 100)
+        lines.append(f"{reference};{vendor};{units}.{cents:02d};{currency};14 March 2026")
+
+    text = "\r\n".join(lines) + "\r\n"
+    size = write("reconcile.csv", text)
+
+    path = os.path.join(RECORDS, "expected.json")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(expected, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+
+    for name in sorted(expected):
+        e = expected[name]
+        print(f"  {name:26} {e['verdict']:14} {e['deviation']}")
+    return size, os.path.getsize(path)
 
 
 def main():
@@ -89,6 +180,8 @@ def main():
         fh.write("reference,vendor,amount,currency,date\n".encode("utf-8"))
         fh.write("PO-2026-0001,Almacén Central,1234.50,EUR,14 March 2026\n".encode("latin-1"))
     written["orders-latin1.csv"] = os.path.getsize(path)
+
+    written["reconcile.csv"], written["expected.json"] = write_reconcile_set()
 
     for name in sorted(written):
         print(f"{name:28} {written[name]:>7,} bytes")

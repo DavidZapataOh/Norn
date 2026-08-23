@@ -1,0 +1,43 @@
+{
+  "digital-continental.pdf": {
+    "verdict": "matched",
+    "why": "the record is the amount the document prints",
+    "deviation": "exact"
+  },
+  "digital-anglo.pdf": {
+    "verdict": "matched",
+    "why": "two minor units is inside the stated tolerance",
+    "deviation": "two cents under, inside tolerance"
+  },
+  "scan-continental.pdf": {
+    "verdict": "mismatch",
+    "why": "one euro under, well outside tolerance",
+    "deviation": "one euro under"
+  },
+  "photo-skewed.png": {
+    "verdict": "mismatch",
+    "why": "a wrong magnitude, the failure that looks most plausible",
+    "deviation": "ten times the amount"
+  },
+  "photo-anglo.png": {
+    "verdict": "mismatch",
+    "why": "a different currency is a hard stop and nothing converts",
+    "deviation": "different currency"
+  },
+  "scan-anglo.pdf": {
+    "verdict": "mismatch",
+    "why": "the vendor is marked inactive",
+    "deviation": "inactive vendor",
+    "deactivateVendor": "Ridgeway Supplies Inc"
+  },
+  "photo-fragmented.png": {
+    "verdict": "no-candidate",
+    "why": "no record was imported for this document",
+    "deviation": "no record at all"
+  },
+  "digital-wrong-total.pdf": {
+    "verdict": "indeterminate",
+    "why": "the gate withheld the amount, so it cannot be compared",
+    "deviation": "arithmetic already wrong"
+  }
+}

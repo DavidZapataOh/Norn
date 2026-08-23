@@ -364,3 +364,20 @@ test("a verdict about a document that does not exist is refused", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a vendor can be deactivated, and its records report it", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.importRows([{ reference: "PO-1", vendor: "Ridgeway Supplies Inc", currency: "GBP",
+      amountMinor: 143264n, issuedOn: null }], { sourceFile: "o.csv" });
+
+    assert.equal(store.candidatesFor({ reference: "PO-1" })[0].active, 1);
+
+    assert.equal(store.deactivateVendor("Ridgeway Supplies Inc"), 1);
+    assert.equal(store.candidatesFor({ reference: "PO-1" })[0].active, 0,
+      "the reconciliation cannot see a vendor the store deactivated");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -61,6 +61,7 @@ function openStore({ file }) {
   const statements = {
     putVendor: db.prepare("INSERT INTO vendors (name, tax_id, active) VALUES (?, ?, ?)"),
     getVendor: db.prepare("SELECT id, name, tax_id AS taxId, active FROM vendors WHERE id = ?"),
+    deactivateVendor: db.prepare("UPDATE vendors SET active = 0 WHERE name = ?"),
     putRecord: db.prepare(`INSERT INTO records
       (vendor_id, reference, reference_key, currency, amount_minor, issued_on, source_file)
       VALUES (?, ?, ?, ?, ?, ?, ?)`),
@@ -113,6 +114,9 @@ function openStore({ file }) {
     putVendor: ({ name, taxId = null, active = 1 }) =>
       Number(statements.putVendor.run(name, taxId, active).lastInsertRowid),
     getVendor: (id) => statements.getVendor.get(id),
+    // A supplier that stopped trading still has records in the ledger, and matching one is a
+    // finding rather than a match.
+    deactivateVendor: (name) => Number(statements.deactivateVendor.run(name).changes),
 
     putRecord: ({ vendorId, reference, currency, amountMinor, issuedOn = null, sourceFile = null }) =>
       Number(statements.putRecord.run(vendorId, reference, referenceKey(reference), currency, amountMinor, issuedOn, sourceFile).lastInsertRowid),
