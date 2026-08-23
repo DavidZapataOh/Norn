@@ -161,3 +161,72 @@ test("a text-layer field keeps its source, so the missing confidence stays expla
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+const importable = [
+  { reference: "PO-1", vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 123450n, issuedOn: "2026-03-14" },
+  { reference: "PO-2", vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 9900n, issuedOn: "2026-03-15" },
+  { reference: "PO-3", vendor: "Harborlight Trading Ltd", currency: "GBP", amountMinor: 500000n, issuedOn: "2026-03-16" },
+];
+
+test("a supplier named on many rows becomes one vendor", () => {
+  const { store, dir } = tempStore();
+  try {
+    const out = store.importRows(importable, { sourceFile: "orders.csv" });
+
+    assert.equal(out.vendors, 2, "the same supplier was created more than once");
+    assert.equal(out.records, 3);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failing row leaves no partial state", () => {
+  const { store, dir } = tempStore();
+  try {
+    const poisoned = [...importable,
+      { reference: "PO-4", vendor: "Solent", currency: "EUR", amountMinor: "not a bigint", issuedOn: null }];
+
+    assert.throws(() => store.importRows(poisoned, { sourceFile: "orders.csv" }));
+    // Half an imported ledger is worse than none: reconciliation would run against the rows
+    // that made it and report matches for a file the user believes failed.
+    assert.equal(store.countRecords(), 0, "a failed import left rows behind");
+    assert.equal(store.countVendors(), 0, "a failed import left vendors behind");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the same reference imported twice is skipped, not duplicated", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.importRows(importable, { sourceFile: "march.csv" });
+    const second = store.importRows(importable, { sourceFile: "march-again.csv" });
+
+    assert.equal(second.records, 0);
+    assert.equal(second.skipped.length, 3);
+    assert.equal(store.countRecords(), 3, "a second import of the same file doubled the ledger");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a money column refuses a value that is not an integer", () => {
+  // SQLite's default typing is advisory: an INTEGER column accepts the string "not a
+  // bigint" and stores it as text, and every later read of that ledger is wrong. STRICT
+  // tables are what make the declared type mean something.
+  const { store, dir } = tempStore();
+  try {
+    const vendorId = store.putVendor({ name: "Solent", active: 1 });
+
+    assert.throws(() => store.putRecord({
+      vendorId, reference: "PO-BAD", currency: "EUR",
+      amountMinor: "not a bigint", issuedOn: null, sourceFile: "x",
+    }), /INTEGER/i);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

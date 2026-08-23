@@ -16,7 +16,7 @@ function openStore({ file }) {
   // a contract, and a row referencing one that is gone is not a failure to discover later.
   db.exec("PRAGMA foreign_keys = ON");
 
-  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL) STRICT");
   const current = db.prepare("SELECT version FROM schema_version").get();
   let version = current ? Number(current.version) : 0;
 
@@ -57,6 +57,11 @@ function openStore({ file }) {
       amount_minor AS amountMinor, issued_on AS issuedOn, source_file AS sourceFile
       FROM records WHERE id = ?`),
 
+    findVendor: db.prepare("SELECT id FROM vendors WHERE name = ?"),
+    findRecord: db.prepare("SELECT id FROM records WHERE vendor_id = ? AND reference = ?"),
+    countRecords: db.prepare("SELECT COUNT(*) AS n FROM records"),
+    countVendors: db.prepare("SELECT COUNT(*) AS n FROM vendors"),
+
     findDocument: db.prepare("SELECT id FROM documents WHERE digest = ?"),
     putDocument: db.prepare("INSERT INTO documents (digest, path, route, read_at) VALUES (?, ?, ?, ?)"),
     getDocument: db.prepare(`SELECT id, digest, path, route, read_at AS readAt
@@ -82,6 +87,48 @@ function openStore({ file }) {
     putRecord: ({ vendorId, reference, currency, amountMinor, issuedOn = null, sourceFile = null }) =>
       Number(statements.putRecord.run(vendorId, reference, currency, amountMinor, issuedOn, sourceFile).lastInsertRowid),
     getRecord: (id) => statements.getRecord.get(id),
+
+    importRows(rows, { sourceFile }) {
+      // One transaction. A file that fails on row 400 must leave nothing behind, because a
+      // half-imported ledger reconciles against the rows that made it.
+      db.exec("BEGIN");
+      try {
+        const vendorIds = new Map();
+        const skipped = [];
+        let records = 0;
+
+        for (const row of rows) {
+          let vendorId = vendorIds.get(row.vendor);
+          if (vendorId === undefined) {
+            const existing = statements.findVendor.get(row.vendor);
+            vendorId = existing
+              ? Number(existing.id)
+              : Number(statements.putVendor.run(row.vendor, null, 1).lastInsertRowid);
+            vendorIds.set(row.vendor, vendorId);
+          }
+
+          // The importer rejects a duplicate within one file; two files can still collide,
+          // and this is the only place that sees both.
+          if (statements.findRecord.get(vendorId, row.reference)) {
+            skipped.push({ reference: row.reference, reason: "already in the ledger" });
+            continue;
+          }
+
+          statements.putRecord.run(vendorId, row.reference, row.currency,
+            row.amountMinor, row.issuedOn, sourceFile);
+          records++;
+        }
+
+        db.exec("COMMIT");
+        return { vendors: vendorIds.size, records, skipped };
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
+    countRecords: () => Number(statements.countRecords.get().n),
+    countVendors: () => Number(statements.countVendors.get().n),
 
     putDocument({ digest, path: filePath, route, fields, now = new Date().toISOString() }) {
       const existing = statements.findDocument.get(digest);
