@@ -11,8 +11,8 @@ const PDFJS_WORKER = require.resolve("pdfjs-dist/build/pdf.worker.min.mjs");
 // pdf.js ships ESM only, and Chromium refuses a file:// module import from a file:// page.
 // Handing the source over as a blob keeps the import same-origin, so the window can stay
 // sandboxed with web security on while it parses an untrusted document.
-function bootstrap({ pdfjs, worker, pdfBase64, scale }) {
-  return `(async () => {
+function preamble({ pdfjs, worker, pdfBase64, scale }) {
+  return `
     const blobUrl = (src) => URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
     const pdfjsLib = await import(blobUrl(${JSON.stringify(pdfjs)}));
     pdfjsLib.GlobalWorkerOptions.workerSrc = blobUrl(${JSON.stringify(worker)});
@@ -24,6 +24,12 @@ function bootstrap({ pdfjs, worker, pdfBase64, scale }) {
     const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
     const page = await doc.getPage(1);
     const viewport = page.getViewport({ scale: ${scale} });
+`;
+}
+
+function bootstrap(args) {
+  return `(async () => {
+    ${preamble(args)}
 
     const canvas = document.getElementById("page");
     canvas.width = Math.round(viewport.width);
@@ -35,6 +41,32 @@ function bootstrap({ pdfjs, worker, pdfBase64, scale }) {
     await page.render({ canvasContext: context, viewport }).promise;
     doc.destroy();
     return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
+  })()`;
+}
+
+// The same page, read rather than drawn. A digital PDF already carries its characters and
+// their positions, so recognising it would spend seconds re-deriving what the file states,
+// and would introduce reading errors the text layer does not have.
+function textBootstrap(args) {
+  return `(async () => {
+    ${preamble(args)}
+    const content = await page.getTextContent();
+    const items = [];
+    for (const item of content.items) {
+      if (!item.str || !item.str.trim()) continue;
+      const t = pdfjsLib.Util.transform(viewport.transform, item.transform);
+      const height = Math.hypot(t[2], t[3]);
+      items.push({
+        text: item.str,
+        bbox: [t[4], t[5] - height, t[4] + item.width * ${args.scale}, t[5]],
+        // No confidence: the file states these characters rather than guessing them, so
+        // there is nothing to measure. Inventing a 1.0 here would satisfy a confidence
+        // gate that had checked nothing, which is worse than declaring the absence.
+        source: "text-layer",
+      });
+    }
+    doc.destroy();
+    return { items, width: viewport.width, height: viewport.height };
   })()`;
 }
 
@@ -88,4 +120,29 @@ async function renderFirstPage(filePath, { scale = 2, outDir } = {}) {
   }
 }
 
-module.exports = { renderFirstPage };
+// Coordinates land in the same space renderFirstPage produces, so a box read here can be
+// drawn over the rendered page without a second transform.
+async function readTextGeometry(filePath, { scale = 2 } = {}) {
+  const started = performance.now();
+  const pdf = fs.readFileSync(filePath);
+
+  const win = new BrowserWindow({
+    show: false,
+    webPreferences: { offscreen: true, sandbox: true, contextIsolation: true },
+  });
+
+  try {
+    await win.loadFile(PAGE);
+    const out = await win.webContents.executeJavaScript(textBootstrap({
+      pdfjs: fs.readFileSync(PDFJS, "utf8"),
+      worker: fs.readFileSync(PDFJS_WORKER, "utf8"),
+      pdfBase64: pdf.toString("base64"),
+      scale,
+    }));
+    return { ...out, ms: Math.round(performance.now() - started) };
+  } finally {
+    if (!win.isDestroyed()) win.destroy();
+  }
+}
+
+module.exports = { renderFirstPage, readTextGeometry };

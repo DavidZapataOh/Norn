@@ -89,3 +89,52 @@ test("a second render of the same document is served from cache", async () => {
     await session.close();
   }
 });
+
+const geometry = (session, pdf) => callInMain(session, "raster.js", "readTextGeometry", [pdf]);
+
+test("a digital PDF yields its text with coordinates, without recognition", async () => {
+  const session = await launchApp();
+  try {
+    const out = await geometry(session, path.join(DOCS, "invoice-digital.pdf"));
+
+    assert.ok(out.items.length > 10, `expected a text layer, got ${out.items.length} items`);
+    const total = out.items.find((i) => i.text.includes("523.81"));
+    assert.ok(total, "the total is in the text layer and was not returned");
+    assert.equal(total.bbox.length, 4);
+    assert.ok(total.bbox[2] > total.bbox[0] && total.bbox[3] > total.bbox[1],
+      `degenerate box ${JSON.stringify(total.bbox)}`);
+
+    // The box has to sit in the same space the rasteriser produces, or a highlight drawn
+    // from it lands somewhere else on the page.
+    const rendered = await render(session, path.join(DOCS, "invoice-digital.pdf"));
+    assert.ok(total.bbox[2] <= rendered.width + 1 && total.bbox[3] <= rendered.height + 1,
+      `box ${JSON.stringify(total.bbox)} falls outside the ${rendered.width}x${rendered.height} page`);
+  } finally {
+    await session.close();
+  }
+});
+
+test("a scanned PDF has no text layer, which is how the caller knows to recognise it", async () => {
+  const session = await launchApp();
+  try {
+    const out = await geometry(session, path.join(DOCS, "invoice-scanned.pdf"));
+    assert.equal(out.items.length, 0);
+  } finally {
+    await session.close();
+  }
+});
+
+test("a text-layer item carries no confidence, because none was measured", async () => {
+  const session = await launchApp();
+  try {
+    const out = await geometry(session, path.join(DOCS, "invoice-digital.pdf"));
+
+    for (const item of out.items) {
+      assert.equal(item.confidence, undefined,
+        "a fabricated confidence here would pass a gate that measured nothing");
+      assert.equal(item.source, "text-layer", "the consumer has to be able to tell these apart");
+    }
+  } finally {
+    await session.close();
+  }
+});
