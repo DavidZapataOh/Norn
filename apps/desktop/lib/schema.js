@@ -140,4 +140,4 @@ function instruction(template) {
   return `Read this ${template.name} and report these fields exactly as printed:\n${lines.join("\n")}`;
 }
 
-module.exports = { FIELD_TYPES, DEFAULT_TEMPLATE, SYSTEM, compile, coerce, instruction };
+module.exports = { FIELD_TYPES, DEFAULT_TEMPLATE, SYSTEM, compile, coerce, coerceDate, instruction };
