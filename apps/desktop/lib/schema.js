@@ -21,7 +21,10 @@ const DEFAULT_TEMPLATE = {
     { key: "invoice_no", label: "Invoice number", type: "string" },
     { key: "date", label: "Issue date", type: "date" },
     { key: "subtotal", label: "Subtotal", type: "amount" },
-    { key: "tax", label: "Tax", type: "amount" },
+    // Measured: without this hint a 4B model answers "21% 90,91" for the tax on every
+    // document that prints the rate beside the amount, because the instruction asks for
+    // the field exactly as printed. Rejections across the digital corpus went 4 to 1.
+    { key: "tax", label: "Tax", type: "amount", hint: "the tax amount only, not the percentage rate" },
     { key: "total", label: "Total", type: "amount" },
   ],
 };
@@ -103,7 +106,10 @@ function coerce(template, raw) {
 
   for (const field of template.fields) {
     const input = raw?.[field.key];
-    if (input === null || input === undefined) {
+    // A model asked for a field the document does not carry answers "" about as often as
+    // null. Both are the same answer, and rejecting one reports a formatting difference as
+    // a failure to read.
+    if (input === null || input === undefined || (typeof input === "string" && !input.trim())) {
       values[field.key] = { type: field.type, raw: input ?? null, value: null };
       continue;
     }

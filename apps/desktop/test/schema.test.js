@@ -118,3 +118,14 @@ test("the instruction does not invite the model to return null", () => {
 test("the system turn forbids invention", () => {
   assert.match(SYSTEM, /never invent/i);
 });
+
+test("an empty string is a declared absence, not an uncoercible value", () => {
+  // Measured: a model asked for a field the document does not carry answers "" as often
+  // as null. Rejecting it reports a formatting difference as a failure to read.
+  const out = coerce(template, { vendor: "", total: "", date: "  ", qty: "" });
+
+  assert.deepEqual(out.rejected, []);
+  for (const key of ["vendor", "total", "date", "qty"]) {
+    assert.equal(out.values[key].value, null, `${key} should be absent, not rejected`);
+  }
+});
