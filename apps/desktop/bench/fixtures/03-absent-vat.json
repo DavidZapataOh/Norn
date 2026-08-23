@@ -1,0 +1,11 @@
+{
+  "id": "absent-vat",
+  "text": "Redwood Systems Inc\n2200 Bridgeway, Sausalito, CA 94965\nEIN on file with vendor management\n\nINVOICE  RW-88214\nIssued: 2026-08-05\n\nDescription                        Amount\nProfessional services, July      4,250.00\nTravel reimbursement               312.75\n\n                    Total:    USD 4,562.75\n\nUS supplier. No VAT registration applies.",
+  "expected": {
+    "invoice_number": "RW-88214",
+    "vendor": "Redwood Systems Inc",
+    "total": 4562.75,
+    "currency": "USD",
+    "vat_number": null
+  }
+}

@@ -6,10 +6,15 @@ const { sdk: defaultSdk } = require("./sdk");
 
 const CACHE_DIR = path.join(os.homedir(), ".qvac", "models");
 
+// Scores are cells correct over 30 (6 documents x 5 fields), from bench/models.bench.js
+// on an M4 / 16 GB. Re-run it after an SDK bump rather than trusting these numbers.
 const TEXT_MODELS = [
-  { key: "qwen3-1.7b", label: "Qwen3 1.7B", constName: "QWEN3_1_7B_INST_Q4" },
-  { key: "qwen3-4b", label: "Qwen3 4B", constName: "QWEN3_4B_INST_Q4_K_M" },
-  { key: "qwen3-8b", label: "Qwen3 8B", constName: "QWEN3_8B_INST_Q4_K_M" },
+  { key: "qwen3-1.7b", label: "Qwen3 1.7B", constName: "QWEN3_1_7B_INST_Q4",
+    score: "27/30", speed: "1.4s/doc" },
+  { key: "qwen3-4b", label: "Qwen3 4B", constName: "QWEN3_4B_INST_Q4_K_M",
+    score: "28/30", speed: "3.0s/doc" },
+  { key: "qwen3-8b", label: "Qwen3 8B", constName: "QWEN3_8B_INST_Q4_K_M",
+    score: null, speed: null },   // not benchmarked: needs 5.03 GB, disk was short
 ];
 
 const VISION_MODELS = [
@@ -73,6 +78,8 @@ async function catalogue({ sdk = defaultSdk, cacheDir = CACHE_DIR } = {}) {
   return {
     text: TEXT_MODELS.map(describe),
     vision: VISION_MODELS.map(describe),
+    // qwen3-4b scored highest and is the default; qwen3-1.7b is 2.2x faster for
+    // one cell less, which is the trade a user makes in the settings pane.
     defaults: { text: "qwen3-4b", vision: "qwen3vl-2b" },
   };
 }

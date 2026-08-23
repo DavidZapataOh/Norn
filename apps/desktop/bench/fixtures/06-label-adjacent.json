@@ -1,0 +1,11 @@
+{
+  "id": "label-adjacent",
+  "text": "Kestrel Marine Supply Pty Ltd\nABN:53 004 085 616\n\nTax InvoiceKES-2026-3391\nInvoice date:2026-08-14\n\nDescription                      Amount\nDeck hardware, assorted        1,240.00\nFreight                          180.00\n\nSubtotal:1,420.00\nGST 10%:142.00\nTotal:AUD 1,562.00",
+  "expected": {
+    "invoice_number": "KES-2026-3391",
+    "vendor": "Kestrel Marine Supply Pty Ltd",
+    "total": 1562.00,
+    "currency": "AUD",
+    "vat_number": "53 004 085 616"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "arithmetic-mismatch",
+  "text": "Havblik Nordic AS\nMVA 999 888 777 MVA\nStorgata 8, Oslo\n\nFAKTURA 2026-0417\nDato: 11.08.2026\n\nBeskrivelse            Antall   Pris      Belop\nKonsulenttjenester         20   950,00   19.000,00\nLisens                      1  2.400,00   2.400,00\n\n                     Sum:              21.400,00\n                     MVA 25%:           5.350,00\n                     A betale:   NOK 25.750,00",
+  "expected": {
+    "invoice_number": "2026-0417",
+    "vendor": "Havblik Nordic AS",
+    "total": 25750.00,
+    "currency": "NOK",
+    "vat_number": "999 888 777 MVA"
+  }
+}

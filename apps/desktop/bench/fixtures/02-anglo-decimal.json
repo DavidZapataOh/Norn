@@ -1,0 +1,11 @@
+{
+  "id": "anglo-decimal",
+  "text": "Northwind Trading Ltd\nVAT GB999 9999 73\n17 Cannon Street, London\n\nINVOICE\nNumber: NOR-2026-1000\nDate: 03 August 2026\n\nItem                     Qty   Unit      Amount\nCloud hosting, annual      1   1,800.00  1,800.00\nSupport retainer          12      85.50  1,026.00\n\n                    Subtotal:            2,826.00\n                    VAT 20%:               565.20\n                    Total due:      GBP 3,391.20",
+  "expected": {
+    "invoice_number": "NOR-2026-1000",
+    "vendor": "Northwind Trading Ltd",
+    "total": 3391.20,
+    "currency": "GBP",
+    "vat_number": "GB999 9999 73"
+  }
+}

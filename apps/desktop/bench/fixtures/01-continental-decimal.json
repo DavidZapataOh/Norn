@@ -1,0 +1,11 @@
+{
+  "id": "continental-decimal",
+  "text": "ACME CORP S.A.\nCUIT 30-71234567-9\nAv. Corrientes 1234, CABA, Argentina\n\nFACTURA A\nN: 0001-00004471\nFecha: 12/08/2026\n\nDescripcion              Cant   P.Unit    Importe\nServicio de consultoria    10   120,00   1.200,00\nLicencia software anual     2   450,00     900,00\nSoporte premium mensual     3    80,00     240,00\n\n                          Subtotal:      2.340,00\n                          IVA 21%:         491,40\n                          TOTAL:    ARS 2.831,40",
+  "expected": {
+    "invoice_number": "0001-00004471",
+    "vendor": "ACME CORP S.A.",
+    "total": 2831.40,
+    "currency": "ARS",
+    "vat_number": "30-71234567-9"
+  }
+}
