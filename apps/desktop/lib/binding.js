@@ -21,7 +21,10 @@ function matches(regionText, coerced) {
     return coerceDate(regionText) === coerced.value;
   }
   if (coerced.type === "integer") {
-    return /^-?\d+$/.test(regionText.trim()) && Number(regionText.trim()) === coerced.value;
+    // A page prints a rate as "21%" and a count as "12". The unit is part of how the number
+    // is written, and refusing it leaves a value that is plainly there unbound.
+    const digits = regionText.trim().match(/^(-?\d+)\s*%?$/);
+    return digits !== null && Number(digits[1]) === coerced.value;
   }
   return loose(regionText) === loose(coerced.value);
 }

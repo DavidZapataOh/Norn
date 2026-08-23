@@ -129,3 +129,14 @@ test("an empty string is a declared absence, not an uncoercible value", () => {
     assert.equal(out.values[key].value, null, `${key} should be absent, not rejected`);
   }
 });
+
+test("the shipped template declares the tax rate the document prints", () => {
+  // Measured: with only subtotal, tax and total, one of the three arithmetic identities
+  // could ever fire. The rate is printed on every invoice and is what makes a second one
+  // checkable, on the path where the confidence floor is inert.
+  const rate = DEFAULT_TEMPLATE.fields.find((f) => f.key === "tax_rate");
+
+  assert.ok(rate, "the template cannot check a rate it never asks for");
+  assert.equal(rate.type, "integer");
+  assert.match(rate.hint, /21/, "the model needs to know it is the percentage, not the amount");
+});

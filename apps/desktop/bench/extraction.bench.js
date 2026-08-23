@@ -68,12 +68,16 @@ async function main() {
         ? await extractor.fromText(route.text)
         : await extractor.fromImage(imagePath);
 
-      const arithmetic = check(extracted.values);
+      // Binding first, and it needs nothing from arithmetic. A value the model produced
+      // that is not on the page must not be used to check the values that are.
+      const bindings = bindAll(extracted.values, regions, { labels });
+      const untrusted = new Set(Object.entries(bindings)
+        .filter(([, b]) => b.status === "unbound").map(([key]) => key));
+
+      const arithmetic = check(extracted.values, { untrusted });
       for (const identity of arithmetic.identities) {
         identityRuns[identity.name] = (identityRuns[identity.name] ?? 0) + 1;
       }
-
-      const bindings = bindAll(extracted.values, regions, { labels });
       const judged = judgeAll(extracted.values, bindings,
         { arithmetic: arithmetic.byField, thresholds: thresholds() });
 

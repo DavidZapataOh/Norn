@@ -25,6 +25,8 @@ const DEFAULT_TEMPLATE = {
     // document that prints the rate beside the amount, because the instruction asks for
     // the field exactly as printed. Rejections across the digital corpus went 4 to 1.
     { key: "tax", label: "Tax", type: "amount", hint: "the tax amount only, not the percentage rate" },
+    { key: "tax_rate", label: "Tax rate", type: "integer",
+      hint: "the percentage rate as printed, for example 21" },
     { key: "total", label: "Total", type: "amount" },
   ],
 };

@@ -103,3 +103,60 @@ test("one failing identity is not cleared by another that passes", () => {
   assert.equal(out.byField.subtotal.ok, false, "a passing identity cleared a failing one");
   assert.equal(out.byField.total.ok, true);
 });
+
+test("the rate identity fires from the extracted fields, without a caller passing it", () => {
+  // The rate is a field the model reads off the page like any other, so the caller has
+  // nothing to supply. An identity that needs an argument no caller has is unreachable.
+  const out = check({
+    subtotal: amount(43290n),
+    tax: amount(9091n),
+    tax_rate: { type: "integer", value: 21 },
+  });
+
+  const identity = out.identities.find((i) => i.name === "tax = subtotal x rate");
+  assert.ok(identity, "the rate was on the page and the identity never ran");
+  assert.equal(identity.ok, true, identity?.detail);
+});
+
+test("a tax that does not match the rate the document states is caught", () => {
+  const out = check({
+    subtotal: amount(43290n),
+    tax: amount(4329n),
+    tax_rate: { type: "integer", value: 21 },
+  });
+
+  assert.equal(out.identities.find((i) => i.name === "tax = subtotal x rate").ok, false);
+  assert.equal(out.byField.tax.ok, false);
+});
+
+test("a rate the model did not find leaves the identity unstated, not failed", () => {
+  const out = check({ subtotal: amount(43290n), tax: amount(9091n),
+                      tax_rate: { type: "integer", value: null } });
+
+  assert.equal(out.identities.find((i) => i.name === "tax = subtotal x rate"), undefined);
+});
+
+test("an identity is not evaluated against a value the binding could not find", () => {
+  // Measured on a document with no VAT line: asked for a rate, the model invented 21, which
+  // bound nowhere. Checking tax against an invented rate fails, and the failure implicates
+  // the subtotal, which is printed on the page and correct. An identity built on a value
+  // that is not there blames the wrong fields.
+  const out = check({
+    subtotal: amount(43290n),
+    tax: amount(0n),
+    tax_rate: { type: "integer", value: 21 },
+  }, { untrusted: new Set(["tax_rate"]) });
+
+  assert.equal(out.identities.find((i) => i.name === "tax = subtotal x rate"), undefined,
+    "the identity ran on a fabricated rate");
+  assert.equal(out.byField.subtotal, undefined, "a correct subtotal was implicated by a fabrication");
+});
+
+test("an untrusted field does not silence an identity it takes no part in", () => {
+  const out = check({
+    subtotal: amount(43290n), tax: amount(9091n), total: amount(52381n),
+    tax_rate: { type: "integer", value: 21 },
+  }, { untrusted: new Set(["tax_rate"]) });
+
+  assert.equal(out.identities.find((i) => i.name === "subtotal + tax = total").ok, true);
+});

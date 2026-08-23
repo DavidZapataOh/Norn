@@ -189,3 +189,27 @@ test("a span inherits the source of its members", () => {
   assert.equal(out.source, "text-layer");
   assert.equal(out.confidence, undefined, "a span of text-layer items has no confidence either");
 });
+
+test("an integer binds to the number the page prints with its unit", () => {
+  // The page prints "VAT 21%" and the field is the integer 21. Requiring digits alone
+  // leaves a rate that is plainly on the page unbound, and the identity that needs it
+  // never runs.
+  const rate = { type: "integer", value: 21, raw: 21 };
+
+  assert.equal(matches("21%", rate), true);
+  assert.equal(matches("21", rate), true);
+  assert.equal(matches("219", rate), false, "a longer number is a different number");
+  assert.equal(matches("2.100", rate), false);
+});
+
+test("a rate fused into its row binds as a span", () => {
+  // Verbatim shape from the corpus: the recogniser and the text layer both return the
+  // label, the rate and the amount as one line.
+  const out = bindField({ type: "integer", value: 21, raw: 21 }, [
+    { text: "VAT 21%", bbox: [80, 600, 240, 630], confidence: 0.97 },
+    { text: "90,91", bbox: [820, 600, 950, 630], confidence: 0.95 },
+  ]);
+
+  assert.equal(out.status, "span");
+  assert.deepEqual(out.bbox, [80, 600, 240, 630]);
+});
