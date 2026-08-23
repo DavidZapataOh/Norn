@@ -18,12 +18,13 @@ function scripted(turns) {
 
 test("the two tools are declared with flat parameters", () => {
   // Tool parameter schemas in this SDK are flat: a type, a description, an optional enum, and
-  // no nested objects or array item types.
+  // no nested objects or array item types. That the shape as a whole is one the SDK accepts is
+  // checked against the SDK's own schema, not restated here.
   assert.equal(NAIVE_TOOLS.length, 2);
   for (const tool of NAIVE_TOOLS) {
-    for (const property of Object.values(tool.function.parameters.properties)) {
+    for (const property of Object.values(tool.parameters.properties)) {
       assert.ok(["string", "number", "integer", "boolean"].includes(property.type),
-        `${tool.function.name} declares a non-flat parameter`);
+        `${tool.name} declares a non-flat parameter`);
     }
   }
 });
@@ -86,4 +87,22 @@ test("a trial that never terminates reports the cap", async () => {
 
   assert.equal(trial.stopReason, "turn-cap");
   assert.equal(trial.turns, 3);
+});
+
+test("the arm runs at 0.7 unless a temperature is asked for", async () => {
+  // 0.7 is what a tool-calling deployment actually runs at, and the default has to be that
+  // rather than the value that flatters the arm. The override exists so the comparison can
+  // answer what the choice is worth instead of footnoting it.
+  const seen = [];
+  const audit = {
+    auditCompletion: async (params) => {
+      seen.push(params.generationParams.temp);
+      return { text: "done", toolCalls: [], toolErrors: [], stopReason: "eos" };
+    },
+  };
+
+  await runNaive({ audit, modelId: "m", seed: 1, host });
+  await runNaive({ audit, modelId: "m", seed: 1, host, temp: 0 });
+
+  assert.deepEqual(seen, [0.7, 0]);
 });

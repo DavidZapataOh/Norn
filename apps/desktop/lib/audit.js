@@ -26,15 +26,19 @@ function createAudit({
 
     try {
       const run = S.completion(params);
-      for await (const _ of run.events) { /* drained; final carries what we need */ }
+      // A rejected tool call exists only here. It is a `toolError` event and never reaches
+      // `final`, so a caller that drains the stream and reads only `final` sees a turn that
+      // called no tool and cannot tell it from a turn that chose to call none.
+      const toolErrors = [];
+      for await (const emitted of run.events) {
+        if (emitted?.type === "toolError") toolErrors.push(emitted.error);
+      }
       const final = await run.final;
       const stats = final?.stats;
 
-      // The two shapes arrive in one array and are told apart by `type`. Separating them here
-      // rather than at each call site, because a caller that has to remember will not.
-      const emitted = final?.toolCalls ?? [];
-      const toolCalls = emitted.filter((e) => e.type === "toolCall").map((e) => e.call);
-      const toolErrors = emitted.filter((e) => e.type === "toolCallError").map((e) => e.error);
+      // Flat calls, no discriminator: `final.toolCalls` is ToolCallWithCall[], which is
+      // { id, name, arguments } and not a tagged union.
+      const toolCalls = final?.toolCalls ?? [];
 
       record({
         op: "completion",

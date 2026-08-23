@@ -32,7 +32,7 @@ const OCR_MODELS = [
   { key: "latin", label: "EasyOCR Latin", constName: "OCR_LATIN", detectorName: "OCR_CRAFT" },
 ];
 
-async function loadArgs(entry, { sdk = defaultSdk, ctxSize = 8192 } = {}) {
+async function loadArgs(entry, { sdk = defaultSdk, ctxSize = 8192, tools = false } = {}) {
   const S = await sdk();
   const weights = S[entry.constName];
   if (!weights) throw new Error(`${entry.label} is not available in this SDK version`);
@@ -40,7 +40,11 @@ async function loadArgs(entry, { sdk = defaultSdk, ctxSize = 8192 } = {}) {
   // A load-time parameter for language models. Without it the Qwen3.5 family emits a
   // <think> block before the JSON even under a grammar. The OCR addon's config schema
   // strips unknown keys silently, so sending it there would never surface as an error.
-  const modelConfig = weights.engine === "ggml-ocr" ? {} : { reasoning_budget: 0 };
+  //
+  // tools is required at load or no tool call is ever emitted. Off by default: the extraction
+  // path sends responseFormat, and the two are mutually exclusive in one request.
+  const modelConfig = weights.engine === "ggml-ocr" ? {}
+    : { reasoning_budget: 0, ...(tools ? { tools: true } : {}) };
 
   if (!entry.projName) {
     return { modelSrc: weights.src, modelType: weights.engine, modelConfig };

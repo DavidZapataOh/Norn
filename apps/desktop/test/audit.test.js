@@ -186,27 +186,33 @@ test("unload never clears the model cache", async () => {
   assert.equal(seen.clearStorage, false);
 });
 
-function toolAudit(logPath, final) {
+function toolAudit(logPath, final, events = []) {
   return createAudit({
     logPath, now: () => "T", elapsed: () => 10,
     sdk: async () => ({
-      completion: () => ({ events: (async function* () {})(), final: Promise.resolve(final) }),
+      completion: () => ({
+        events: (async function* () { for (const e of events) yield e; })(),
+        final: Promise.resolve(final),
+      }),
     }),
   });
 }
 
 test("a completion's tool calls and tool errors reach the caller, separated", async () => {
+  // The two live in different places. final.toolCalls is a flat array of calls with no
+  // discriminator on it, and a rejected call never reaches final at all: it is a toolError
+  // event and nothing else. A caller reading only final sees a turn that called no tool and
+  // cannot tell it from a turn that chose not to.
   const audit = toolAudit(tempLog(), {
     contentText: "",
-    // Both shapes arrive in the same array and are told apart by type. Separating them at
-    // each call site means a caller eventually forgets.
-    toolCalls: [
-      { type: "toolCall", call: { id: "1", name: "lookup_record", arguments: { reference: "NW-1" } } },
-      { type: "toolCallError", error: { code: "VALIDATION_ERROR", message: "amount is not a number" } },
-    ],
+    toolCalls: [{ id: "1", name: "lookup_record", arguments: { reference: "NW-1" } }],
     stopReason: "eos",
     stats: {},
-  });
+  }, [
+    { type: "contentDelta", seq: 0, text: "" },
+    { type: "toolError", seq: 1,
+      error: { code: "VALIDATION_ERROR", message: "amount is not a number" } },
+  ]);
 
   const out = await audit.auditCompletion({ modelId: "m" }, { model: "test" });
 
@@ -224,12 +230,10 @@ test("the audit record counts tool calls and tool errors", async () => {
   const logPath = tempLog();
   await toolAudit(logPath, {
     contentText: "",
-    toolCalls: [
-      { type: "toolCall", call: { id: "1", name: "lookup_record", arguments: {} } },
-      { type: "toolCallError", error: { code: "PARSE_ERROR", message: "x" } },
-    ],
+    toolCalls: [{ id: "1", name: "lookup_record", arguments: {} }],
     stopReason: "eos", stats: {},
-  }).auditCompletion({ modelId: "m" }, { model: "test" });
+  }, [{ type: "toolError", seq: 0, error: { code: "PARSE_ERROR", message: "x" } }])
+    .auditCompletion({ modelId: "m" }, { model: "test" });
 
   const line = JSON.parse(fs.readFileSync(logPath, "utf8").trim().split("\n").pop());
   assert.equal(line.tool_calls, 1);

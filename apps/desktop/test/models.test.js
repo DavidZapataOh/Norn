@@ -153,3 +153,20 @@ test("an OCR entry accounts for its detector in size and cache state", async () 
   assert.equal(list.length, 2, "the detector was not counted as an asset");
   assert.deepEqual(list.map((a) => a.modelId).sort(), ["craft.gguf", "latin_g2.gguf"]);
 });
+
+test("a model can be loaded with tool calling enabled", async () => {
+  // Without tools: true at load, no tool call is ever emitted, and the arm being measured
+  // would score zero for a reason that has nothing to do with the model.
+  const entry = TEXT_MODELS.find((m) => m.key === "qwen3-4b");
+  const args = await loadArgs(entry, { sdk: fakeSdk, tools: true });
+
+  assert.equal(args.modelConfig.tools, true);
+  assert.equal(args.modelConfig.reasoning_budget, 0, "the existing configuration was dropped");
+});
+
+test("tool calling is off unless it is asked for", async () => {
+  const entry = TEXT_MODELS.find((m) => m.key === "qwen3-4b");
+  const args = await loadArgs(entry, { sdk: fakeSdk });
+
+  assert.equal(args.modelConfig.tools, undefined);
+});

@@ -1,33 +1,34 @@
 "use strict";
 
-// Flat parameters: this SDK's tool schemas take a type, a description and an optional enum,
-// with no nested objects and no array item types.
+// The name, the description and the parameters sit at the top level. The nested
+// { type: "function", function: {...} } shape other vendors use parses as this SDK's other
+// accepted form -- a tool whose parameters are a zod schema -- and throws inside the SDK
+// reading a property of undefined rather than failing validation with a message.
+//
+// Parameters are flat: a type, a description and an optional enum, with no nested objects and
+// no array item types.
 const NAIVE_TOOLS = [
   {
     type: "function",
-    function: {
-      name: "lookup_record",
-      description: "Look up the stored purchase order matching a reference. Returns its amount.",
-      parameters: {
-        type: "object",
-        properties: { reference: { type: "string", description: "The invoice reference." } },
-        required: ["reference"],
-      },
+    name: "lookup_record",
+    description: "Look up the stored purchase order matching a reference. Returns its amount.",
+    parameters: {
+      type: "object",
+      properties: { reference: { type: "string", description: "The invoice reference." } },
+      required: ["reference"],
     },
   },
   {
     type: "function",
-    function: {
-      name: "compute_variance",
-      description: "Subtract b from a and return the difference. Use this instead of computing.",
-      parameters: {
-        type: "object",
-        properties: {
-          a: { type: "number", description: "The document's total, in minor units." },
-          b: { type: "number", description: "The amount lookup_record returned, in minor units." },
-        },
-        required: ["a", "b"],
+    name: "compute_variance",
+    description: "Subtract b from a and return the difference. Use this instead of computing.",
+    parameters: {
+      type: "object",
+      properties: {
+        a: { type: "number", description: "The document's total, in minor units." },
+        b: { type: "number", description: "The amount lookup_record returned, in minor units." },
       },
+      required: ["a", "b"],
     },
   },
 ];
@@ -41,7 +42,7 @@ const NAIVE_SYSTEM =
   "3. Report the variance compute_variance returned.\n" +
   "You never perform arithmetic yourself. Every number in your answer comes from a tool.";
 
-async function runNaive({ audit, modelId, seed, host, maxTurns = 6, task }) {
+async function runNaive({ audit, modelId, seed, host, maxTurns = 6, task, temp = 0.7 }) {
   const history = [
     { role: "system", content: NAIVE_SYSTEM },
     { role: "user", content: task ?? "Reconcile invoice NW-2026-0117. Its total is 52381 minor units." },
@@ -52,9 +53,9 @@ async function runNaive({ audit, modelId, seed, host, maxTurns = 6, task }) {
   for (let turn = 1; turn <= maxTurns; turn++) {
     const out = await audit.auditCompletion({
       modelId, history, stream: true, tools: NAIVE_TOOLS,
-      // Deliberately non-zero. A deployed system does not get to assume greedy decoding, and
-      // a result that held only at zero would not characterise the regime.
-      generationParams: { temp: 0.7, seed: seed + turn, predict: 400 },
+      // Deliberately non-zero by default. A deployed system does not get to assume greedy
+      // decoding, and a result that held only at zero would not characterise the regime.
+      generationParams: { temp, seed: seed + turn, predict: 400 },
     }, { model: "naive", event: `turn-${turn}` });
 
     // Recorded, never retried: a retry hides the rate this arm exists to measure.
