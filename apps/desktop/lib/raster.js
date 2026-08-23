@@ -1,8 +1,8 @@
 "use strict";
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { app, BrowserWindow, nativeImage } = require("electron");
+const { shortDigest } = require("./digest");
 
 const PAGE = path.join(__dirname, "raster-page.html");
 const PDFJS = require.resolve("pdfjs-dist/build/pdf.min.mjs");
@@ -79,7 +79,7 @@ async function renderFirstPage(filePath, { scale = 2, outDir } = {}) {
   fs.mkdirSync(dir, { recursive: true });
 
   const pdf = fs.readFileSync(filePath);
-  const digest = crypto.createHash("sha256").update(pdf).digest("hex").slice(0, 16);
+  const digest = shortDigest(pdf);
   const imagePath = path.join(dir, `${digest}.png`);
 
   // Keyed on content, not path: the same document arriving twice under two names renders

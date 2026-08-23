@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "electron .",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
   },
   "devDependencies": {
     "electron": "^43.4.1",
