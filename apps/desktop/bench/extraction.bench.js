@@ -2,14 +2,10 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { inspect } = require("../lib/reader");
-const { readPage } = require("../lib/recogniser");
-const { joinSplitNumbers } = require("../lib/geometry");
 const { createAudit } = require("../lib/audit");
 const { createExtractor } = require("../lib/extractor");
-const { bindAll } = require("../lib/binding");
-const { check } = require("../lib/arithmetic");
-const { judgeAll, DEFAULT_THRESHOLDS } = require("../lib/gate");
+const { createPipeline } = require("../lib/pipeline");
+const { DEFAULT_THRESHOLDS } = require("../lib/gate");
 const { DEFAULT_TEMPLATE } = require("../lib/schema");
 const { scoreDocument, aggregateExtraction } = require("./extraction-report");
 const { launchApp, callInMain } = require("../test/helpers/launch");
@@ -37,6 +33,13 @@ async function main() {
   const labels = Object.fromEntries(DEFAULT_TEMPLATE.fields.map((f) => [f.key, f.label]));
   const session = await launchApp();
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "norn-extraction-"));
+  const pipeline = createPipeline({
+    extractor, audit, template: DEFAULT_TEMPLATE, outDir, thresholds: thresholds(),
+    raster: {
+      renderFirstPage: (file, opts) => callInMain(session, "raster.js", "renderFirstPage", [file, opts]),
+      readTextGeometry: (file) => callInMain(session, "raster.js", "readTextGeometry", [file]),
+    },
+  });
   const rows = [];
   const identityRuns = {};
 
@@ -45,51 +48,19 @@ async function main() {
       const doc = truth[name];
       if (doc.mode === "skip") continue;
       if (ONLY && !ONLY.slice(7).split(",").includes(name)) continue;
-      const file = path.join(CORPUS, name);
-      const started = performance.now();
 
-      const route = await inspect(file);
-      let regions = [];
-      let imagePath = route.kind === "image" ? route.imagePath : null;
+      const out = await pipeline.run(path.join(CORPUS, name));
+      if (out.skipped) continue;
 
-      if (route.kind === "text") {
-        // A digital PDF already carries its characters and their positions. Recognising it
-        // would spend seconds re-deriving what the file states, and would introduce reading
-        // errors the text layer does not have.
-        regions = (await callInMain(session, "raster.js", "readTextGeometry", [file])).items;
-      } else {
-        if (route.kind === "pdf-needs-render") {
-          imagePath = (await callInMain(session, "raster.js", "renderFirstPage", [file, { outDir }])).imagePath;
-        }
-        regions = joinSplitNumbers((await readPage(imagePath, { audit })).regions);
-      }
-
-      const extracted = route.kind === "text"
-        ? await extractor.fromText(route.text)
-        : await extractor.fromImage(imagePath);
-
-      // Binding first, and it needs nothing from arithmetic. A value the model produced
-      // that is not on the page must not be used to check the values that are.
-      const bindings = bindAll(extracted.values, regions, { labels });
-      const untrusted = new Set(Object.entries(bindings)
-        .filter(([, b]) => b.status === "unbound").map(([key]) => key));
-
-      const arithmetic = check(extracted.values, { untrusted });
-      for (const identity of arithmetic.identities) {
+      for (const identity of out.identities) {
         identityRuns[identity.name] = (identityRuns[identity.name] ?? 0) + 1;
       }
-      const judged = judgeAll(extracted.values, bindings,
-        { arithmetic: arithmetic.byField, thresholds: thresholds() });
 
       const wanted = doc.fields.map((f) => ({ ...f, field: TRUTH_KEY[f.field] ?? f.field }));
       rows.push({
-        name, route: route.kind, ms: Math.round(performance.now() - started),
-        regions: regions.length,
-        // Counted against the gate's own admissions, not against the scored fields: the
-        // template can declare fields the corpus has no ground truth for, and dividing one
-        // by the other produced a fraction above one.
-        gateAdmitted: judged.admitted, naConfidence: judged.confidenceNotApplicable,
-        ...scoreDocument(wanted, judged.fields),
+        name, route: out.route, ms: out.timings.totalMs, regions: out.regions,
+        gateAdmitted: out.admitted, naConfidence: out.confidenceNotApplicable,
+        ...scoreDocument(wanted, out.fields),
       });
     }
   } finally {
