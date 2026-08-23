@@ -62,11 +62,14 @@ function bindWithin(coerced, row) {
       const members = row.slice(start, end + 1);
       const text = members.map((r) => r.text).join(" ");
       if (!matches(text, coerced) && !containsValue(text, coerced)) continue;
+      const scored = members.filter((r) => typeof r.confidence === "number");
       return {
         status: "span",
         bbox: members.map((r) => r.bbox).reduce(union),
-        // A span is only as trustworthy as its weakest region.
-        confidence: Math.min(...members.map((r) => r.confidence ?? 1)),
+        // A span is only as trustworthy as its weakest region, and a span of regions that
+        // never reported a confidence has none to inherit.
+        ...(scored.length ? { confidence: Math.min(...scored.map((r) => r.confidence)) } : {}),
+        ...(members[0].source ? { source: members[0].source } : {}),
         text,
       };
     }
@@ -81,7 +84,11 @@ function bindField(coerced, regions) {
 
   const hit = regions.find((r) => matches(r.text, coerced));
   if (hit) {
-    return { status: "region", bbox: hit.bbox, confidence: hit.confidence, text: hit.text };
+    return {
+      status: "region", bbox: hit.bbox, text: hit.text,
+      ...(typeof hit.confidence === "number" ? { confidence: hit.confidence } : {}),
+      ...(hit.source ? { source: hit.source } : {}),
+    };
   }
 
   for (const row of rows(regions.filter((r) => Array.isArray(r.bbox)))) {
@@ -121,7 +128,9 @@ function bindAll(values, regions, { labels = {} } = {}) {
         : null;
       const chosen = preferred ?? candidates[0];
       out[key] = {
-        status: "region", bbox: chosen.bbox, confidence: chosen.confidence, text: chosen.text,
+        status: "region", bbox: chosen.bbox, text: chosen.text,
+        ...(typeof chosen.confidence === "number" ? { confidence: chosen.confidence } : {}),
+        ...(chosen.source ? { source: chosen.source } : {}),
         // Recorded rather than hidden: an arbitrary box under a highlight is worse than a
         // note that the value was ambiguous.
         contested: candidates.length,

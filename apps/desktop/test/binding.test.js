@@ -163,3 +163,29 @@ test("a date fused to its label binds as a span", () => {
   assert.equal(out.status, "span");
   assert.deepEqual(out.bbox, [90, 250, 470, 285]);
 });
+
+test("a binding carries the source of the region it came from", () => {
+  // The gate has to tell a text-layer region, which has no confidence to report, from a
+  // recognised one that failed to report its own.
+  const fromText = bindField(amount(283140n), [
+    { text: "2.831,40", bbox: [820, 500, 1020, 530], source: "text-layer" },
+  ]);
+  assert.equal(fromText.source, "text-layer");
+  assert.equal(fromText.confidence, undefined);
+
+  const fromOcr = bindField(amount(283140n), [
+    { text: "2.831,40", bbox: [820, 500, 1020, 530], confidence: 0.94 },
+  ]);
+  assert.equal(fromOcr.source, undefined);
+  assert.equal(fromOcr.confidence, 0.94);
+});
+
+test("a span inherits the source of its members", () => {
+  const out = bindField(string("RW-2026-3310"), [
+    { text: "Invoice no. RW-2026-3310", bbox: [120, 200, 480, 232], source: "text-layer" },
+  ]);
+
+  assert.equal(out.status, "span");
+  assert.equal(out.source, "text-layer");
+  assert.equal(out.confidence, undefined, "a span of text-layer items has no confidence either");
+});
