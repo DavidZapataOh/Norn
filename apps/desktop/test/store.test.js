@@ -230,3 +230,137 @@ test("a money column refuses a value that is not an integer", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a reference match is found first, even through recogniser noise", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.importRows([
+      { reference: "NW-2026-0117", vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 52381n, issuedOn: null },
+      { reference: "HL-2026-4471", vendor: "Harborlight Trading Ltd", currency: "EUR", amountMinor: 52381n, issuedOn: null },
+    ], { sourceFile: "orders.csv" });
+
+    const exact = store.candidatesFor({ reference: "NW-2026-0117", vendor: null, currency: "EUR", amountMinor: 52381n });
+    assert.equal(exact[0].reference, "NW-2026-0117");
+
+    // A recogniser that returns ES-XOOOOOOOX for ES-X0000000X will do this to a reference.
+    const noisy = store.candidatesFor({ reference: "NW 2026 0117", vendor: null, currency: "EUR", amountMinor: 52381n });
+    assert.equal(noisy[0].reference, "NW-2026-0117", "punctuation noise lost a reference the reviewer can see");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("with no reference, vendor and amount and currency must all agree", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.importRows([
+      { reference: "PO-1", vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 52381n, issuedOn: null },
+      { reference: "PO-2", vendor: "Harborlight Trading Ltd", currency: "EUR", amountMinor: 52381n, issuedOn: null },
+      { reference: "PO-3", vendor: "Northwind Paper Supply SL", currency: "USD", amountMinor: 52381n, issuedOn: null },
+    ], { sourceFile: "orders.csv" });
+
+    const found = store.candidatesFor({
+      reference: null, vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 52381n,
+    });
+
+    assert.equal(found.length, 1, "the vendor or the currency was ignored");
+    assert.equal(found[0].reference, "PO-1");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an amount alone never matches anything", () => {
+  const { store, dir } = tempStore();
+  try {
+    store.importRows([
+      { reference: "PO-1", vendor: "Northwind Paper Supply SL", currency: "EUR", amountMinor: 52381n, issuedOn: null },
+    ], { sourceFile: "orders.csv" });
+
+    // A real ledger has many rows at the same amount, and picking one at random is the worst
+    // outcome this product can produce: a confident wrong verdict. SQL refuses a NULL
+    // comparison on its own, so the early return is what turns an absent field into an
+    // empty result instead of a binding error.
+    assert.deepEqual(
+      store.candidatesFor({ reference: null, vendor: null, currency: null, amountMinor: 52381n }), []);
+    assert.deepEqual(
+      store.candidatesFor({ reference: null, vendor: "Northwind Paper Supply SL", currency: "EUR" }), [],
+      "an absent amount threw instead of returning nothing");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a document with no verdict is not known as reconciled", () => {
+  const { store, dir } = tempStore();
+  try {
+    assert.equal(store.wasReconciled("d".repeat(64)), false);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const { reconcile } = require("../lib/reconcile");
+
+test("a verdict is stored with every check it was made of", () => {
+  const { store, dir } = tempStore();
+  try {
+    const { id } = store.putDocument({
+      digest: "e".repeat(64), path: "/docs/x.pdf", route: "text", fields: judged().fields,
+    });
+    store.importRows([{ reference: "NW-2026-0117", vendor: "Northwind Paper Supply SL",
+      currency: "EUR", amountMinor: 52381n, issuedOn: null }], { sourceFile: "o.csv" });
+
+    const candidates = store.candidatesFor({ reference: "NW-2026-0117", vendor: null, currency: "EUR", amountMinor: 52381n });
+    const verdict = reconcile({
+      invoice_no: { key: "invoice_no", admitted: true, type: "string", value: "NW-2026-0117" },
+      currency: { key: "currency", admitted: true, type: "string", value: "EUR" },
+      total: { key: "total", admitted: true, type: "amount", value: 52381n },
+    }, candidates);
+
+    const reconciliationId = store.putReconciliation(id, verdict);
+    const back = store.getReconciliation(id);
+
+    assert.equal(back.id, reconciliationId);
+    assert.equal(back.decision, verdict.decision);
+    assert.equal(back.checks.length, verdict.checks.length, "a check was lost on the way to disk");
+    for (const check of back.checks) {
+      assert.ok(check.detail.length > 0, "a stored check forgot what it compared");
+    }
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a stored verdict makes the document known as reconciled", () => {
+  const { store, dir } = tempStore();
+  try {
+    const { id } = store.putDocument({
+      digest: "f".repeat(64), path: "/docs/y.pdf", route: "text", fields: judged().fields,
+    });
+    assert.equal(store.wasReconciled("f".repeat(64)), false);
+
+    store.putReconciliation(id, reconcile({}, []));
+
+    assert.equal(store.wasReconciled("f".repeat(64)), true,
+      "the duplicate check cannot see a verdict that was written");
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a verdict about a document that does not exist is refused", () => {
+  const { store, dir } = tempStore();
+  try {
+    assert.throws(() => store.putReconciliation(9999, reconcile({}, [])), /FOREIGN KEY/i);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

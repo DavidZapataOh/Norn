@@ -60,6 +60,31 @@ const MIGRATIONS = [
       CREATE INDEX fields_key        ON document_fields (key);
     `,
   },
+  {
+    version: 2,
+    up: `
+      ALTER TABLE records ADD COLUMN reference_key TEXT;
+      CREATE INDEX records_reference_key ON records (reference_key);
+
+      CREATE TABLE reconciliations (
+        id           INTEGER PRIMARY KEY,
+        document_id  INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        record_id    INTEGER REFERENCES records(id),
+        decision     TEXT NOT NULL,
+        variance     INTEGER,
+        computed_at  TEXT NOT NULL
+      ) STRICT;
+
+      CREATE TABLE reconciliation_checks (
+        reconciliation_id INTEGER NOT NULL REFERENCES reconciliations(id) ON DELETE CASCADE,
+        name              TEXT NOT NULL,
+        outcome           TEXT NOT NULL,
+        detail            TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX reconciliations_document ON reconciliations (document_id);
+    `,
+  },
 ];
 
 module.exports = { MIGRATIONS };

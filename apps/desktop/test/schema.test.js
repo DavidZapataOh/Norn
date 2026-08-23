@@ -140,3 +140,12 @@ test("the shipped template declares the tax rate the document prints", () => {
   assert.equal(rate.type, "integer");
   assert.match(rate.hint, /21/, "the model needs to know it is the percentage, not the amount");
 });
+
+test("the shipped template asks for the currency the document prints", () => {
+  // The verdict compares currencies and refuses to convert. A template that never asks for
+  // one makes that check indeterminate on every document.
+  const currency = DEFAULT_TEMPLATE.fields.find((f) => f.key === "currency");
+
+  assert.ok(currency, "the reconciliation cannot compare a currency the template never asks for");
+  assert.equal(currency.type, "string");
+});

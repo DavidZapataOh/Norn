@@ -28,6 +28,8 @@ const DEFAULT_TEMPLATE = {
     { key: "tax_rate", label: "Tax rate", type: "integer",
       hint: "the percentage rate as printed, for example 21" },
     { key: "total", label: "Total", type: "amount" },
+    { key: "currency", label: "Currency", type: "string",
+      hint: "the three-letter code beside the total, for example EUR" },
   ],
 };
 

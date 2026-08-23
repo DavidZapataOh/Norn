@@ -111,3 +111,15 @@ test("the corpus covers every class the report needs", () => {
     }
   }
 });
+
+test("every corpus document states a currency, so asking for one is not asking it to invent", () => {
+  // Measured on the previous corpus: asked for a field the page does not carry, the model
+  // answers anyway. Nine documents stating no currency would have produced nine inventions.
+  const truth = JSON.parse(fs.readFileSync(path.join(CORPUS, "truth.json"), "utf8"));
+
+  for (const [name, doc] of Object.entries(truth)) {
+    if (doc.mode === "skip") continue;
+    assert.match(doc.page_text, /\b(EUR|GBP)\b/,
+      `${name} prints no currency, so the model would have to invent one`);
+  }
+});

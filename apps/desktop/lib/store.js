@@ -4,6 +4,17 @@ const { MIGRATIONS } = require("./migrations");
 
 const CURRENT_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;
 
+// A recogniser that returned ES-XOOOOOOOX for ES-X0000000X will do the same to a reference,
+// and a comparison demanding the exact string misses rows a reviewer can see match.
+// Alphanumerics only is enough, and does not merge two genuinely different references.
+const referenceKey = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+// A flagged statement returns every INTEGER as a BigInt, so the ids and the active flag
+// arrive alongside the money and have to come back down.
+const plainRow = (row) => (row === undefined ? undefined : {
+  ...row, id: Number(row.id), active: Number(row.active),
+});
+
 function openStore({ file }) {
   const db = new DatabaseSync(file);
 
@@ -51,8 +62,27 @@ function openStore({ file }) {
     putVendor: db.prepare("INSERT INTO vendors (name, tax_id, active) VALUES (?, ?, ?)"),
     getVendor: db.prepare("SELECT id, name, tax_id AS taxId, active FROM vendors WHERE id = ?"),
     putRecord: db.prepare(`INSERT INTO records
-      (vendor_id, reference, currency, amount_minor, issued_on, source_file)
-      VALUES (?, ?, ?, ?, ?, ?)`),
+      (vendor_id, reference, reference_key, currency, amount_minor, issued_on, source_file)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`),
+    byReference: money(`SELECT r.id, r.reference, v.name AS vendorName, r.currency,
+      r.amount_minor AS amountMinor, v.active
+      FROM records r JOIN vendors v ON v.id = r.vendor_id
+      WHERE r.reference_key = ?`),
+    byVendorAmount: money(`SELECT r.id, r.reference, v.name AS vendorName, r.currency,
+      r.amount_minor AS amountMinor, v.active
+      FROM records r JOIN vendors v ON v.id = r.vendor_id
+      WHERE v.name = ? AND r.currency = ? AND r.amount_minor = ?`),
+    wasReconciled: db.prepare(`SELECT 1 AS found FROM reconciliations c
+      JOIN documents d ON d.id = c.document_id WHERE d.digest = ?`),
+    putReconciliation: db.prepare(`INSERT INTO reconciliations
+      (document_id, record_id, decision, variance, computed_at) VALUES (?, ?, ?, ?, ?)`),
+    putCheck: db.prepare(`INSERT INTO reconciliation_checks
+      (reconciliation_id, name, outcome, detail) VALUES (?, ?, ?, ?)`),
+    getReconciliation: money(`SELECT id, record_id AS recordId, decision, variance,
+      computed_at AS computedAt FROM reconciliations WHERE document_id = ?
+      ORDER BY id DESC LIMIT 1`),
+    getChecks: db.prepare(`SELECT name, outcome, detail FROM reconciliation_checks
+      WHERE reconciliation_id = ? ORDER BY rowid`),
     getRecord: money(`SELECT id, vendor_id AS vendorId, reference, currency,
       amount_minor AS amountMinor, issued_on AS issuedOn, source_file AS sourceFile
       FROM records WHERE id = ?`),
@@ -85,8 +115,56 @@ function openStore({ file }) {
     getVendor: (id) => statements.getVendor.get(id),
 
     putRecord: ({ vendorId, reference, currency, amountMinor, issuedOn = null, sourceFile = null }) =>
-      Number(statements.putRecord.run(vendorId, reference, currency, amountMinor, issuedOn, sourceFile).lastInsertRowid),
+      Number(statements.putRecord.run(vendorId, reference, referenceKey(reference), currency, amountMinor, issuedOn, sourceFile).lastInsertRowid),
     getRecord: (id) => statements.getRecord.get(id),
+
+    candidatesFor({ reference, vendor, currency, amountMinor }) {
+      if (reference) {
+        const found = statements.byReference.all(referenceKey(reference));
+        if (found.length) return found.map(plainRow);
+      }
+      // Never on amount alone: a real ledger has many rows at the same amount, and picking
+      // one at random is a confident wrong verdict. SQL already refuses, since nothing
+      // equals NULL; this returns early so an absent field is an empty result rather than
+      // "cannot be bound to SQLite parameter", which reads like a bug in the query.
+      if (!vendor || !currency || amountMinor === null || amountMinor === undefined) return [];
+      return statements.byVendorAmount.all(vendor, currency, amountMinor).map(plainRow);
+    },
+
+    wasReconciled: (digest) => statements.wasReconciled.get(digest) !== undefined,
+
+    putReconciliation(documentId, verdict, now = new Date().toISOString()) {
+      db.exec("BEGIN");
+      try {
+        const id = Number(statements.putReconciliation.run(
+          documentId, verdict.record ? verdict.record.id : null, verdict.decision,
+          verdict.variance ? verdict.variance.minor : null, now).lastInsertRowid);
+
+        // The checks, not just the decision. A verdict a reviewer cannot open is a score
+        // with more words, and the only question six months later is which check failed.
+        for (const check of verdict.checks) {
+          statements.putCheck.run(id, check.name, check.outcome, check.detail);
+        }
+        db.exec("COMMIT");
+        return id;
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
+    getReconciliation(documentId) {
+      const row = statements.getReconciliation.get(documentId);
+      if (!row) return null;
+      return {
+        id: Number(row.id),
+        recordId: row.recordId === null ? null : Number(row.recordId),
+        decision: row.decision,
+        variance: row.variance,
+        computedAt: row.computedAt,
+        checks: statements.getChecks.all(Number(row.id)),
+      };
+    },
 
     importRows(rows, { sourceFile }) {
       // One transaction. A file that fails on row 400 must leave nothing behind, because a
@@ -114,8 +192,8 @@ function openStore({ file }) {
             continue;
           }
 
-          statements.putRecord.run(vendorId, row.reference, row.currency,
-            row.amountMinor, row.issuedOn, sourceFile);
+          statements.putRecord.run(vendorId, row.reference, referenceKey(row.reference),
+            row.currency, row.amountMinor, row.issuedOn, sourceFile);
           records++;
         }
 

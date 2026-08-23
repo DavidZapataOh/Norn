@@ -35,14 +35,25 @@ SCAN_DPI = 150.0
 SCAN_FACTOR = 72.0 * RENDER_SCALE / SCAN_DPI
 
 
-def money(value_minor, convention):
-    """2831.40 as "2.831,40" or "2,831.40". The corpus needs both conventions for the
-    same underlying value, since reading one as the other is a 1000x error."""
+def money(value_minor, convention, code=None):
+    """2831.40 as "2.831,40" or "2,831.40", optionally prefixed with its currency.
+
+    The corpus needs both conventions for the same underlying value, since reading one as the
+    other is a 1000x error. It also needs a currency somewhere: a reconciliation compares
+    currencies and refuses to convert, and a corpus that states none forces the check to be
+    skipped or the model to invent the answer.
+    """
     units, cents = divmod(abs(value_minor), 100)
     groups = f"{units:,}"
-    if convention == "latin":
-        return f"{groups.replace(',', '.')},{cents:02d}"
-    return f"{groups},{cents:02d}"
+    # The two branches must actually differ. They did not until now: both wrote a comma
+    # decimal, so every document labelled anglo was continental and the class was never
+    # exercised. The amount parser reads either, which is why nothing said so.
+    body = (f"{groups.replace(',', '.')},{cents:02d}" if convention == "latin"
+            else f"{groups}.{cents:02d}")
+    return f"{code} {body}" if code else body
+
+
+CURRENCIES = {"latin": "EUR", "anglo": "GBP"}
 
 
 def invoice_lines(spec):
@@ -65,7 +76,10 @@ def invoice_lines(spec):
     ]
     if spec.get("vat_minor") is not None:
         rows.append(("vat", f"VAT 21%                               {money(spec['vat_minor'], c)}", ""))
-    rows.append(("total", f"Total due                            {money(spec['total_minor'], c)}", ""))
+    # Two tracked fields on one row: an invoice prints its currency beside the total rather
+    # than on a line of its own.
+    rows.append((("total", "currency"),
+                 f"Total due                        {money(spec['total_minor'], c, spec['currency'])}", ""))
     rows.append((None, "Payment to IBAN ES00 0000 0000 0000 (fake)", ""))
     return rows
 
@@ -78,6 +92,7 @@ def field_value(key, spec):
         "date": spec["date"],
         "vat": money(spec["vat_minor"], c) if spec.get("vat_minor") is not None else None,
         "total": money(spec["total_minor"], c),
+        "currency": spec["currency"],
     }[key]
 
 
@@ -88,22 +103,25 @@ def draw_pdf(path, spec):
     fields, y = [], page_h - 70
 
     for key, line, _ in invoice_lines(spec):
+        keys = (key,) if isinstance(key, str) else (key or ())
         size = 20 if line == "INVOICE" else 10
-        font = "Helvetica-Bold" if key in ("vendor", "total") or line == "INVOICE" else "Helvetica"
+        font = "Helvetica-Bold" if "vendor" in keys or "total" in keys or line == "INVOICE" else "Helvetica"
         c.setFont(font, size)
         c.drawString(56, y, line)
 
-        if key:
-            value = field_value(key, spec)
+        for k in keys:
+            value = field_value(k, spec)
+            if value is None or value not in line:
+                continue
             # The box covers the value itself, not its label, so a hit means the reader
             # located the number rather than the row it sits on.
-            prefix = line[: line.rindex(value)] if value and value in line else ""
+            prefix = line[: line.rindex(value)]
             x0 = 56 + pdfmetrics.stringWidth(prefix, font, size)
             x1 = x0 + pdfmetrics.stringWidth(value, font, size)
             ascent = size * 0.75
             descent = size * 0.21
             fields.append({
-                "field": key,
+                "field": k,
                 "text": value,
                 "bbox": [round(x0 * RENDER_SCALE, 1), round((page_h - y - ascent) * RENDER_SCALE, 1),
                          round(x1 * RENDER_SCALE, 1), round((page_h - y + descent) * RENDER_SCALE, 1)],
@@ -144,18 +162,21 @@ def draw_image(spec, skew=0.0, uneven=False, seed=5):
     fields, y = [], 70
 
     for key, line, _ in invoice_lines(spec):
+        keys = (key,) if isinstance(key, str) else (key or ())
         size = 40 if line == "INVOICE" else 22
-        font = _font(size, bold=key in ("vendor", "total") or line == "INVOICE")
+        font = _font(size, bold="vendor" in keys or "total" in keys or line == "INVOICE")
         draw.text((60, y), line, font=font, fill=25)
 
-        if key:
-            value = field_value(key, spec)
-            prefix = line[: line.rindex(value)] if value and value in line else ""
+        for k in keys:
+            value = field_value(k, spec)
+            if value is None or value not in line:
+                continue
+            prefix = line[: line.rindex(value)]
             x0 = 60 + draw.textlength(prefix, font=font)
             x1 = x0 + draw.textlength(value, font=font)
             box = [x0, y, x1, y + size]
             fields.append({
-                "field": key, "text": value,
+                "field": k, "text": value,
                 "bbox": rotate_box(box, skew, PHOTO_SIZE) if skew else [round(v, 1) for v in box],
             })
         y += size + 14
@@ -174,39 +195,39 @@ DOCS = [
     # name, spec, how it is delivered, the classes it exists to cover
     ("digital-continental.pdf",
      dict(vendor="Northwind Paper Supply SL", invoice_no="NW-2026-0117", date="14 March 2026",
-          convention="latin", subtotal=43290, vat_minor=9091, total_minor=52381),
+          convention="latin", currency="EUR", subtotal=43290, vat_minor=9091, total_minor=52381),
      "pdf", ["digital", "continental"]),
     ("digital-anglo.pdf",
      dict(vendor="Harborlight Trading Ltd", invoice_no="HL-2026-4471", date="02 April 2026",
-          convention="anglo", subtotal=43290, vat_minor=9091, total_minor=52381),
+          convention="anglo", currency="GBP", subtotal=43290, vat_minor=9091, total_minor=52381),
      "pdf", ["digital", "anglo"]),
     ("digital-wrong-total.pdf",
      dict(vendor="Verdant Office Group", invoice_no="VO-2026-0088", date="19 April 2026",
-          convention="latin", subtotal=43290, vat_minor=9091, total_minor=61200),
+          convention="latin", currency="EUR", subtotal=43290, vat_minor=9091, total_minor=61200),
      "pdf", ["digital", "arithmetic-wrong"]),
     ("digital-absent-vat.pdf",
      dict(vendor="Kestrel Print Works", invoice_no="KP-2026-0231", date="27 April 2026",
-          convention="anglo", subtotal=43290, vat_minor=None, total_minor=43290),
+          convention="anglo", currency="GBP", subtotal=43290, vat_minor=None, total_minor=43290),
      "pdf", ["digital", "absent-field"]),
     ("scan-continental.pdf",
      dict(vendor="Solent Paper Company", invoice_no="SP-2026-1902", date="05 May 2026",
-          convention="latin", subtotal=118400, vat_minor=24864, total_minor=143264),
+          convention="latin", currency="EUR", subtotal=118400, vat_minor=24864, total_minor=143264),
      "scan", ["scan", "continental"]),
     ("scan-anglo.pdf",
      dict(vendor="Ridgeway Supplies Inc", invoice_no="RW-2026-3310", date="11 May 2026",
-          convention="anglo", subtotal=118400, vat_minor=24864, total_minor=143264),
+          convention="anglo", currency="GBP", subtotal=118400, vat_minor=24864, total_minor=143264),
      "scan", ["scan", "anglo"]),
     ("photo-skewed.png",
      dict(vendor="Lanternfield Stationers", invoice_no="LF-2026-0771", date="18 May 2026",
-          convention="latin", subtotal=249116, vat_minor=52314, total_minor=301430),
+          convention="latin", currency="EUR", subtotal=249116, vat_minor=52314, total_minor=301430),
      "photo", ["photo", "continental"]),
     ("photo-fragmented.png",
      dict(vendor="Ashgrove Paper Mill", invoice_no="AG-2026-0654", date="23 May 2026",
-          convention="latin", subtotal=145900, vat_minor=30639, total_minor=176539),
+          convention="latin", currency="EUR", subtotal=145900, vat_minor=30639, total_minor=176539),
      "photo", ["photo", "fragmented"]),
     ("photo-anglo.png",
      dict(vendor="Cobblestone Office Ltd", invoice_no="CS-2026-8123", date="29 May 2026",
-          convention="anglo", subtotal=249116, vat_minor=52314, total_minor=301430),
+          convention="anglo", currency="GBP", subtotal=249116, vat_minor=52314, total_minor=301430),
      "photo", ["photo", "anglo"]),
 ]
 
