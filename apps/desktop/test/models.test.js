@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { TEXT_MODELS, VISION_MODELS, loadArgs, catalogue, download } = require("../lib/models");
+const { TEXT_MODELS, VISION_MODELS, OCR_MODELS, loadArgs, assets, catalogue, download } = require("../lib/models");
 
 const registry = {
   QWEN3_4B_INST_Q4_K_M: {
@@ -115,4 +115,41 @@ test("download uses assetSrc and reports one monotonic progress track", async ()
   for (let i = 1; i < seen.length; i++) {
     assert.ok(seen[i] >= seen[i - 1], `progress went backwards: ${seen[i - 1]} then ${seen[i]}`);
   }
+});
+
+const ocrRegistry = {
+  OCR_LATIN: { src: "registry://s3/latin_g2.gguf", engine: "ggml-ocr",
+               modelId: "latin_g2.gguf", expectedSize: 15396512 },
+  OCR_CRAFT: { src: "registry://s3/craft.gguf", engine: "ggml-ocr",
+               modelId: "craft.gguf", expectedSize: 83000000 },
+};
+const fakeOcrSdk = async () => ocrRegistry;
+
+test("an OCR entry resolves without a projector and keeps its engine", async () => {
+  const entry = OCR_MODELS.find((m) => m.key === "latin");
+  const args = await loadArgs(entry, { sdk: fakeOcrSdk });
+
+  assert.equal(args.modelSrc, "registry://s3/latin_g2.gguf");
+  assert.equal(args.modelType, "ggml-ocr");
+  assert.equal(args.modelConfig.projectionModelSrc, undefined);
+});
+
+test("an OCR entry is not given language-model parameters", async () => {
+  // The OCR addon's config schema is non-strict (z.core.$strip), so passing
+  // reasoning_budget here would be dropped silently and never surface as an error.
+  const entry = OCR_MODELS.find((m) => m.key === "latin");
+  const args = await loadArgs(entry, { sdk: fakeOcrSdk });
+
+  assert.equal(args.modelConfig.reasoning_budget, undefined,
+    "a language-model parameter reached an OCR model");
+});
+
+test("an OCR entry accounts for its detector in size and cache state", async () => {
+  // The detector is a separate 83 MB download. Counting only the recogniser would
+  // report a model as cached while a file it cannot run without is still missing.
+  const entry = OCR_MODELS.find((m) => m.key === "latin");
+  const list = await assets(entry, { sdk: fakeOcrSdk });
+
+  assert.equal(list.length, 2, "the detector was not counted as an asset");
+  assert.deepEqual(list.map((a) => a.modelId).sort(), ["craft.gguf", "latin_g2.gguf"]);
 });

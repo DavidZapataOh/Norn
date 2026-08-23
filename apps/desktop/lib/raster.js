@@ -38,6 +38,9 @@ function bootstrap({ pdfjs, worker, pdfBase64, scale }) {
   })()`;
 }
 
+// Scale 2 (144 dpi on A4) is chosen from recognition, not render cost: rendering is flat
+// across scales, while scale 1 loses six regions and scale 3 recovers none for 4 s more
+// detection.
 async function renderFirstPage(filePath, { scale = 2, outDir } = {}) {
   const started = performance.now();
   const dir = outDir || path.join(app.getPath("temp"), "norn-render");

@@ -146,7 +146,11 @@ def main():
     textpoor_pdf(out("invoice-textpoor.pdf"), scan_png)
     os.remove(scan_png)
 
-    scan_image(width=900, height=1400, skew=2.2, uneven=True, seed=3).save(out("receipt-photo.png"))
+    photo = scan_image(width=900, height=1400, skew=2.2, uneven=True, seed=3)
+    photo.save(out("receipt-photo.png"))
+    # A page fed in sideways, which is what the recogniser's rotation sweep exists for.
+    # Without it the sweep can only be measured for its cost.
+    photo.rotate(90, expand=True).save(out("receipt-sideways.png"))
 
     corrupt_pdf(out("invoice-corrupt.pdf"), out("invoice-digital.pdf"))
     huge_pdf(out("invoice-huge.pdf"), out("invoice-digital.pdf"))

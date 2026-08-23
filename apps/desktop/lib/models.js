@@ -24,14 +24,23 @@ const VISION_MODELS = [
     constName: "QWEN3_5_4B_MULTIMODAL_Q4_K_M", projName: "MMPROJ_QWEN3_5_4B_MULTIMODAL_F16" },
 ];
 
+// The SDK derives the CRAFT detector from OCR_LATIN at load time, so it is never passed
+// as configuration. It is still named here because it is a separate 83 MB download, and a
+// catalogue that counted only the recogniser would call the model cached while the file it
+// cannot run without was missing.
+const OCR_MODELS = [
+  { key: "latin", label: "EasyOCR Latin", constName: "OCR_LATIN", detectorName: "OCR_CRAFT" },
+];
+
 async function loadArgs(entry, { sdk = defaultSdk, ctxSize = 8192 } = {}) {
   const S = await sdk();
   const weights = S[entry.constName];
   if (!weights) throw new Error(`${entry.label} is not available in this SDK version`);
 
-  // A load-time parameter. Without it the Qwen3.5 family emits a <think> block
-  // before the JSON even under a grammar. Harmless on models that do not reason.
-  const modelConfig = { reasoning_budget: 0 };
+  // A load-time parameter for language models. Without it the Qwen3.5 family emits a
+  // <think> block before the JSON even under a grammar. The OCR addon's config schema
+  // strips unknown keys silently, so sending it there would never surface as an error.
+  const modelConfig = weights.engine === "ggml-ocr" ? {} : { reasoning_budget: 0 };
 
   if (!entry.projName) {
     return { modelSrc: weights.src, modelType: weights.engine, modelConfig };
@@ -65,28 +74,31 @@ async function catalogue({ sdk = defaultSdk, cacheDir = CACHE_DIR } = {}) {
 
   const describe = (entry) => {
     const weights = S[entry.constName];
-    const projector = entry.projName ? S[entry.projName] : null;
-    if (!weights || (entry.projName && !projector)) {
+    const companion = entry.projName || entry.detectorName;
+    const second = companion ? S[companion] : null;
+    if (!weights || (companion && !second)) {
       // A settings pane must degrade one row, not blank the window.
       return { ...entry, available: false, cached: false, bytes: 0, why: "not in @qvac/sdk" };
     }
-    const bytes = (weights.expectedSize || 0) + (projector?.expectedSize || 0);
-    const cached = present.has(weights.modelId) && (!projector || present.has(projector.modelId));
+    const bytes = (weights.expectedSize || 0) + (second?.expectedSize || 0);
+    const cached = present.has(weights.modelId) && (!second || present.has(second.modelId));
     return { ...entry, available: true, cached, bytes };
   };
 
   return {
     text: TEXT_MODELS.map(describe),
     vision: VISION_MODELS.map(describe),
+    ocr: OCR_MODELS.map(describe),
     // qwen3-4b scored highest and is the default; qwen3-1.7b is 2.2x faster for
     // one cell less, which is the trade a user makes in the settings pane.
-    defaults: { text: "qwen3-4b", vision: "qwen3vl-2b" },
+    defaults: { text: "qwen3-4b", vision: "qwen3vl-2b", ocr: "latin" },
   };
 }
 
 async function assets(entry, { sdk = defaultSdk } = {}) {
   const S = await sdk();
-  return [entry.constName, entry.projName].filter(Boolean).map((n) => S[n]).filter(Boolean);
+  return [entry.constName, entry.projName, entry.detectorName]
+    .filter(Boolean).map((n) => S[n]).filter(Boolean);
 }
 
 // Progress is reported across the pair, not per file: two bars that each reach 100%
@@ -126,5 +138,6 @@ async function download(entry, onProgress, { sdk = defaultSdk } = {}) {
 }
 
 module.exports = {
-  TEXT_MODELS, VISION_MODELS, loadArgs, cachedIds, catalogue, assets, download, CACHE_DIR,
+  TEXT_MODELS, VISION_MODELS, OCR_MODELS,
+  loadArgs, cachedIds, catalogue, assets, download, CACHE_DIR,
 };
