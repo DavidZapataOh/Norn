@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { app, BrowserWindow } = require("electron");
 const { createShutdown } = require("./lib/shutdown");
+const { createAudit } = require("./lib/audit");
 
 // Two processes sharing the model cache deadlock over the native worker with no
 // error and no rejection, so the second instance must exit rather than degrade.
@@ -11,6 +12,14 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 const shutdown = createShutdown();
+
+// One log for the whole application, resolved against the app's data directory rather
+// than the working directory. A per-module path produces several logs that each
+// undercount, and an evidence log that undercounts is worse than none.
+const audit = createAudit({
+  logPath: path.join(app.getPath("userData"), "evidence", "inference.jsonl"),
+});
+
 let mainWindow = null;
 
 app.on("second-instance", () => {
@@ -64,4 +73,4 @@ app.on("before-quit", async (event) => {
   app.exit(0);
 });
 
-module.exports = { shutdown };
+module.exports = { shutdown, audit };
