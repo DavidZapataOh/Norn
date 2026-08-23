@@ -185,3 +185,65 @@ test("unload never clears the model cache", async () => {
 
   assert.equal(seen.clearStorage, false);
 });
+
+function toolAudit(logPath, final) {
+  return createAudit({
+    logPath, now: () => "T", elapsed: () => 10,
+    sdk: async () => ({
+      completion: () => ({ events: (async function* () {})(), final: Promise.resolve(final) }),
+    }),
+  });
+}
+
+test("a completion's tool calls and tool errors reach the caller, separated", async () => {
+  const audit = toolAudit(tempLog(), {
+    contentText: "",
+    // Both shapes arrive in the same array and are told apart by type. Separating them at
+    // each call site means a caller eventually forgets.
+    toolCalls: [
+      { type: "toolCall", call: { id: "1", name: "lookup_record", arguments: { reference: "NW-1" } } },
+      { type: "toolCallError", error: { code: "VALIDATION_ERROR", message: "amount is not a number" } },
+    ],
+    stopReason: "eos",
+    stats: {},
+  });
+
+  const out = await audit.auditCompletion({ modelId: "m" }, { model: "test" });
+
+  assert.equal(out.toolCalls.length, 1);
+  assert.equal(out.toolCalls[0].name, "lookup_record");
+  assert.deepEqual(out.toolCalls[0].arguments, { reference: "NW-1" });
+  assert.equal(out.toolErrors.length, 1);
+  assert.equal(out.toolErrors[0].code, "VALIDATION_ERROR");
+  assert.equal(out.stopReason, "eos");
+});
+
+test("the audit record counts tool calls and tool errors", async () => {
+  // A trial that emitted nothing and a trial that emitted a malformed call are different
+  // events, and a log recording both as "one completion" cannot tell them apart afterwards.
+  const logPath = tempLog();
+  await toolAudit(logPath, {
+    contentText: "",
+    toolCalls: [
+      { type: "toolCall", call: { id: "1", name: "lookup_record", arguments: {} } },
+      { type: "toolCallError", error: { code: "PARSE_ERROR", message: "x" } },
+    ],
+    stopReason: "eos", stats: {},
+  }).auditCompletion({ modelId: "m" }, { model: "test" });
+
+  const line = JSON.parse(fs.readFileSync(logPath, "utf8").trim().split("\n").pop());
+  assert.equal(line.tool_calls, 1);
+  assert.equal(line.tool_errors, 1);
+  assert.equal(line.stop_reason, "eos");
+});
+
+test("a completion with no tools returns empty arrays, not undefined", async () => {
+  // Every existing caller reads { text, stats } and must keep working.
+  const out = await toolAudit(tempLog(), {
+    contentText: "hello", toolCalls: [], stats: { tokensPerSecond: 9 },
+  }).auditCompletion({ modelId: "m" }, { model: "test" });
+
+  assert.equal(out.text, "hello");
+  assert.deepEqual(out.toolCalls, []);
+  assert.deepEqual(out.toolErrors, []);
+});

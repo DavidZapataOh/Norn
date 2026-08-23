@@ -30,6 +30,12 @@ function createAudit({
       const final = await run.final;
       const stats = final?.stats;
 
+      // The two shapes arrive in one array and are told apart by `type`. Separating them here
+      // rather than at each call site, because a caller that has to remember will not.
+      const emitted = final?.toolCalls ?? [];
+      const toolCalls = emitted.filter((e) => e.type === "toolCall").map((e) => e.call);
+      const toolErrors = emitted.filter((e) => e.type === "toolCallError").map((e) => e.error);
+
       record({
         op: "completion",
         model,
@@ -42,10 +48,14 @@ function createAudit({
         cache_tokens: stats?.cacheTokens,
         backend_device: stats?.backendDevice,
         seed: params?.generationParams?.seed,
+        tool_calls: toolCalls.length,
+        tool_errors: toolErrors.length,
+        stop_reason: final?.stopReason,
         metrics_source: stats ? "profiler-raw" : "wall-clock",
       });
 
-      return { text: String(final?.contentText ?? ""), stats };
+      return { text: String(final?.contentText ?? ""), stats, toolCalls, toolErrors,
+               stopReason: final?.stopReason };
     } catch (error) {
       // A failed inference is still an inference that happened. A log holding only
       // successes describes a system that never fails.
