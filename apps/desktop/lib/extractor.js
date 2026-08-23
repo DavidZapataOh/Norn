@@ -28,12 +28,28 @@ function withSilenceWatchdog(silenceMs, start) {
   return Promise.race([start(bump), guard]).finally(() => timer && clearTimeout(timer));
 }
 
+// The quantisation is the tail of the registry constant, which is where the SDK puts it:
+// QWEN3_4B_INST_Q4_K_M is Q4_K_M, QWEN3_1_7B_INST_Q4 is Q4. Derived rather than listed a
+// second time, so a new entry cannot arrive with the two disagreeing.
+const quantisationOf = (constName) => (constName.match(/_(Q\d[\w]*)$/)?.[1] ?? "unknown");
+
 const DEFAULT_TEXT = "qwen3-4b";
 const DEFAULT_VISION = "qwen3vl-2b";
 
 // Recorded in the replay descriptor, so it has to be a value that was really sent rather than
 // an assumption that greedy decoding is deterministic.
 const DEFAULT_SEED = 4242;
+
+// Which model a route will run, answerable before anything is loaded. Replay decides
+// comparability first, and asking the route rather than the certificate is the point: comparing
+// a recorded model against itself always agrees.
+function modelForRoute(route) {
+  if (route === "text") return TEXT_MODELS.find((m) => m.key === DEFAULT_TEXT).constName;
+  if (route === "image" || route === "pdf-needs-render") {
+    return VISION_MODELS.find((m) => m.key === DEFAULT_VISION).constName;
+  }
+  throw new Error(`no model is defined for route "${route}"`);
+}
 
 function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 90_000,
                            seed = DEFAULT_SEED }) {
@@ -94,7 +110,11 @@ function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 
         `model output is not valid JSON, most likely truncated at the token limit: ` +
         `${clean.slice(0, 120)}`);
     }
-    return { ...coerce(template, raw), raw, stats };
+    // The model that ran, not the one that is the default. A descriptor reading the default
+    // would be wrong for any run that overrode it, and wrong in a way replay cannot detect:
+    // it would faithfully reproduce a run nobody performed.
+    return { ...coerce(template, raw), raw, stats,
+             model: entry.constName, quantisation: quantisationOf(entry.constName) };
   }
 
   return {
@@ -114,4 +134,5 @@ function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 
   };
 }
 
-module.exports = { createExtractor, cleanJson, DEFAULT_TEXT, DEFAULT_VISION };
+module.exports = { createExtractor, modelForRoute, cleanJson,
+                   DEFAULT_TEXT, DEFAULT_VISION, DEFAULT_SEED };

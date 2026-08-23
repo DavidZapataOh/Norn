@@ -30,3 +30,9 @@ test("the real SDK exposes the surface this application depends on", async () =>
     assert.equal(typeof S[name], "function", `@qvac/sdk is missing ${name}`);
   }
 });
+
+test("the SDK version is readable without a second module reaching the SDK", () => {
+  // The SDK exports no version constant, so the manifest is the source. It is read inside the
+  // one module allowed to reach the package: a subpath import anywhere else is a second door.
+  assert.match(probe.sdkVersion(), /^\d+\.\d+\.\d+/);
+});

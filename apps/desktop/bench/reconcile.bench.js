@@ -10,12 +10,17 @@ const { importRecords, sniff, parseDelimited, proposeMapping } = require("../lib
 const { reconcile } = require("../lib/reconcile");
 const { digestFile } = require("../lib/digest");
 const { DEFAULT_TEMPLATE } = require("../lib/schema");
+const { certifyRun } = require("../lib/certificate");
+const { loadOrCreateKey, sign } = require("../lib/signing");
+const { sdkVersion } = require("../lib/sdk");
+const { DEFAULT_SEED } = require("../lib/extractor");
 const { tally, VERDICTS } = require("./reconcile-report");
 const { launchApp, callInMain } = require("../test/helpers/launch");
 
 const CORPUS = path.join(__dirname, "..", "fixtures", "corpus");
 const RECORDS = path.join(__dirname, "..", "fixtures", "records");
 const ONLY = process.argv.find((a) => a.startsWith("--only="));
+const CERTS = (process.argv.find((a) => a.startsWith("--certs=")) ?? "").slice(8);
 
 // The value the gate admitted, or the value it declined, so reconcile can distinguish
 // "the document says nothing" from "the gate withheld it".
@@ -57,6 +62,11 @@ async function main() {
   const results = [];
   const rows = [];
   let duplicateMs = null;
+  let signingKey = null;
+  if (CERTS) {
+    fs.mkdirSync(CERTS, { recursive: true });
+    signingKey = loadOrCreateKey({ file: path.join(CERTS, "key.pem") }).privateKey;
+  }
 
   try {
     for (const name of Object.keys(expected).sort()) {
@@ -79,6 +89,15 @@ async function main() {
 
       const verdict = reconcile(out.fields, candidates, { alreadySeen });
       store.putReconciliation(stored.id, verdict);
+
+      if (CERTS) {
+        const certificate = certifyRun({
+          file, run: out, verdict, sdkVersion: sdkVersion(), seed: DEFAULT_SEED,
+          currency: lookup(out.fields, "currency")?.value ?? null,
+        });
+        fs.writeFileSync(path.join(CERTS, `${name}.json`),
+          JSON.stringify(sign(certificate, signingKey), null, 2));
+      }
 
       const ms = Math.round(performance.now() - started);
       results.push({ name, expected: expected[name].verdict, actual: verdict.decision });

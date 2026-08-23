@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norn.local/schema/certificate-1.0.json",
+  "title": "Reconciliation certificate",
+  "description": "A portable record of one document's reconciliation: what was read, where each value was found, what was refused and why, the chained trace of the run, and everything needed to reproduce it. Amounts are integers in minor units carried as decimal strings, because a JSON number cannot hold one without a precision claim nobody made.",
+  "type": "object",
+  "required": [
+    "version",
+    "document",
+    "declared",
+    "verdict",
+    "fields",
+    "abstentions",
+    "attestations",
+    "trace",
+    "replay"
+  ],
+  "properties": {
+    "version": {
+      "description": "The format version. Written from the first certificate, so a verifier knows what it is reading before it starts reading it.",
+      "enum": [
+        "1.0"
+      ]
+    },
+    "producedAt": {
+      "description": "When the certificate was written. Excluded from replay comparison: it varies by construction.",
+      "type": "string"
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "digest",
+        "route",
+        "page"
+      ],
+      "properties": {
+        "digest": {
+          "type": "string",
+          "description": "SHA-256 of the document's bytes. This, not the path, is the document's identity.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Where the file sat when it was read. Excluded from replay comparison."
+        },
+        "route": {
+          "type": "string",
+          "enum": [
+            "text",
+            "image",
+            "pdf-needs-render"
+          ],
+          "description": "Which mechanism read the document: its own text layer, recognition of an image, or recognition of a rasterised PDF page."
+        },
+        "page": {
+          "type": "integer",
+          "description": "Always 1. Every reader in this pipeline reads the first page.",
+          "const": 1
+        }
+      }
+    },
+    "declared": {
+      "description": "The field keys the template asked for. fields and abstentions together must account for exactly this list: without it, a deleted abstention leaves a certificate that is internally consistent and quietly incomplete.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": [
+        "decision",
+        "checks",
+        "variance",
+        "record"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "enum": [
+            "matched",
+            "mismatch",
+            "indeterminate",
+            "no-candidate"
+          ]
+        },
+        "checks": {
+          "description": "The named checks that produced the decision. A verdict a reviewer cannot open is a score with more words.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "outcome",
+              "detail"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "indeterminate"
+                ]
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "variance": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "minor",
+            "proportion"
+          ],
+          "properties": {
+            "minor": {
+              "type": "string",
+              "pattern": "^-?[0-9]+$"
+            },
+            "proportion": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "record": {
+          "description": "The second-source record the document was compared against.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "reference",
+            "currency",
+            "minor"
+          ],
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "minor": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^-?[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "fields": {
+      "description": "Values the gate admitted. A field here is one the document states and that was located on the page. Keyed by field name; disjoint from abstentions.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "key",
+          "type",
+          "page",
+          "bbox",
+          "confidence",
+          "width",
+          "checks"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "amount",
+              "date",
+              "integer"
+            ]
+          },
+          "page": {
+            "type": "integer"
+          },
+          "bbox": {
+            "description": "Where the value was found, as [x0, y0, x1, y1]. Null only when the field is explicitly marked unbound.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "unbound": {
+            "type": "boolean",
+            "description": "Present and true when the value was admitted without a region. Required if bbox is null."
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Null where the reading mechanism reports none, which is the text layer."
+          },
+          "width": {
+            "type": "string",
+            "enum": [
+              "region",
+              "span"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "minor": {
+            "type": "string",
+            "description": "Amount fields only. Minor units as decimal digits.",
+            "pattern": "^-?[0-9]+$"
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Amount fields only."
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "null"
+            ],
+            "description": "Non-amount fields only."
+          },
+          "checks": {
+            "description": "Which signals actually ran. An admission that skipped the confidence floor must not read like one that cleared it.",
+            "type": "object",
+            "required": [
+              "confidence",
+              "binding",
+              "arithmetic"
+            ],
+            "properties": {
+              "confidence": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "not applicable"
+                ]
+              },
+              "binding": {
+                "type": "string",
+                "enum": [
+                  "region",
+                  "span"
+                ]
+              },
+              "arithmetic": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "failed",
+                  "not checked"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "abstentions": {
+      "description": "Values the gate refused, each with the check that refused it and the value it declined. A first-class entry rather than a null in fields, because a reader must be able to tell 'could not read this' from 'this field does not apply'.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "check",
+          "reason",
+          "type",
+          "page",
+          "bbox",
+          "confidence",
+          "text",
+          "declined"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "check": {
+            "type": "string",
+            "enum": [
+              "absent",
+              "binding",
+              "confidence",
+              "arithmetic"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "amount",
+              "date",
+              "integer"
+            ]
+          },
+          "page": {
+            "type": "integer"
+          },
+          "bbox": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the reading mechanism saw at that region."
+          },
+          "declined": {
+            "description": "The value that was refused. It travels with the abstention so that caution can be scored against truth rather than assumed free.",
+            "type": "object",
+            "properties": {
+              "minor": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^-?[0-9]+$"
+              },
+              "currency": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "attestations": {
+      "description": "External facts with evidence of their origin. Empty rather than absent: a reader cannot tell a missing feature from a step that passed silently.",
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "trace": {
+      "description": "The run, one record per stage, each chained to the one before it. Records carry keys and digests, never values.",
+      "type": "object",
+      "required": [
+        "root",
+        "records"
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "stage",
+              "action",
+              "reads",
+              "writes",
+              "digest",
+              "head"
+            ],
+            "properties": {
+              "stage": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "reads": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "writes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "head": {
+                "type": "string",
+                "description": "The chain value this record produced. Carried so a verifier can name which record broke the chain rather than only that it broke.",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "replay": {
+      "description": "Everything needed to reproduce the run. If reproducing it needs something absent here, this descriptor is incomplete and that is the defect.",
+      "type": "object",
+      "required": [
+        "model",
+        "quantisation",
+        "sdkVersion",
+        "seed",
+        "inputDigest"
+      ],
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "quantisation": {
+          "type": "string"
+        },
+        "sdkVersion": {
+          "type": "string"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "inputDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "signature": {
+      "description": "Ed25519 over the canonical serialisation of everything except this section.",
+      "type": "object",
+      "required": [
+        "alg",
+        "publicKey",
+        "sig",
+        "digest"
+      ],
+      "properties": {
+        "alg": {
+          "const": "ed25519"
+        },
+        "publicKey": {
+          "type": "string"
+        },
+        "sig": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

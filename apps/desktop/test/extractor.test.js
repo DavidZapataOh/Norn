@@ -1,7 +1,7 @@
 "use strict";
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createExtractor, DEFAULT_SEED } = require("../lib/extractor");
+const { createExtractor, modelForRoute, DEFAULT_SEED } = require("../lib/extractor");
 
 const registry = {
   QWEN3_4B_INST_Q4_K_M: { src: "registry://s3/qwen3-4b.gguf", engine: "llamacpp-completion",
@@ -185,4 +185,34 @@ test("the extractor shares no cache between runs", async () => {
   await createExtractor({ audit, sdk, template }).fromText("x");
 
   assert.equal(audit.calls.completion[0].params.kvCache, false);
+});
+
+test("an extraction reports which model produced it, and the route decides which", async () => {
+  // The replay descriptor names the model that ran. Reading the default instead would make
+  // the descriptor wrong for any run that overrode it, and wrong in a way replay could not
+  // detect: it would faithfully reproduce a run nobody performed.
+  const audit = fakeAudit();
+  const extractor = createExtractor({ audit, sdk, template });
+
+  const text = await extractor.fromText("x");
+  const vision = await extractor.fromImage("/tmp/page.png");
+
+  assert.equal(text.model, "QWEN3_4B_INST_Q4_K_M");
+  assert.equal(text.quantisation, "Q4_K_M");
+  // A different route runs a different model, and the descriptor has to say which.
+  assert.equal(vision.model, "QWEN3VL_2B_MULTIMODAL_Q4_K");
+  assert.equal(vision.quantisation, "Q4_K");
+});
+
+test("the model a route will use is resolvable without running the route", async () => {
+  // Replay has to decide comparability before loading anything. Comparing the recorded model
+  // against itself always agrees, which is what the first version did: it cost a full model
+  // load to discover a mismatch the comparison should have refused instantly.
+  assert.equal(modelForRoute("text"), "QWEN3_4B_INST_Q4_K_M");
+  assert.equal(modelForRoute("image"), "QWEN3VL_2B_MULTIMODAL_Q4_K");
+  assert.equal(modelForRoute("pdf-needs-render"), "QWEN3VL_2B_MULTIMODAL_Q4_K");
+});
+
+test("an unknown route names itself rather than resolving to a default", () => {
+  assert.throws(() => modelForRoute("carrier-pigeon"), /carrier-pigeon/);
 });

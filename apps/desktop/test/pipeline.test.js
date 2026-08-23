@@ -182,3 +182,53 @@ test("a document read at a different confidence has a different trace root", asy
 
   assert.notEqual(less.trace.root, confident.trace.root);
 });
+
+test("a run reports the model that extracted it, so a descriptor can name it", async () => {
+  const d = doubles({ regions: [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }] });
+  d.extractor.fromText = async () => ({
+    ...coerce(template, { vendor: "Northwind", total: "523,81" }),
+    raw: { vendor: "Northwind", total: "523,81" },
+    model: "QWEN3_4B_INST_Q4_K_M", quantisation: "Q4_K_M",
+  });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "digital-continental.pdf"));
+
+  assert.equal(out.model, "QWEN3_4B_INST_Q4_K_M");
+  assert.equal(out.quantisation, "Q4_K_M");
+});
+
+test("a run reports the fields the template asked for, not only the ones it got", async () => {
+  // Without this a reader cannot tell a field that was never requested from one whose
+  // abstention was deleted: both are simply absent.
+  const d = doubles({ regions: [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }] });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "digital-continental.pdf"));
+
+  assert.deepEqual(out.declared, ["vendor", "total"]);
+});
+
+test("a run reports the page's dimensions in the same units as the regions", async () => {
+  // A box a reader cannot place on the page is not evidence. Given [112, 178, 375, 198] and
+  // nothing else, a reader has no way to know what fraction of the page that is.
+  const d = doubles({ regions: [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }] });
+  d.raster.readTextGeometry = async () => ({ items: d.regions ?? [], width: 1191, height: 1684 });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "digital-continental.pdf"));
+
+  assert.equal(out.page.width, 1191);
+  assert.equal(out.page.height, 1684);
+});
+
+test("the rendered route reports the rendered page's dimensions", async () => {
+  const d = doubles({ regions: [{ text: "3.014,30", bbox: [1, 1, 2, 2], confidence: 0.9 }] });
+  d.raster.renderFirstPage = async () => ({ imagePath: "/tmp/page.png", width: 1240, height: 1754 });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "scan-continental.pdf"));
+
+  assert.equal(out.page.width, 1240);
+  assert.equal(out.page.height, 1754);
+});

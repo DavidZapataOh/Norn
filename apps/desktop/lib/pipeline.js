@@ -21,21 +21,26 @@ function createPipeline({ extractor, audit, raster, readPage = defaultReadPage,
       // A digital PDF already carries its characters and their positions. Recognising it
       // spends seconds re-deriving what the file states, and introduces reading errors the
       // text layer does not have.
-      const { items } = await raster.readTextGeometry(filePath);
+      const { items, width, height } = await raster.readTextGeometry(filePath);
       note("geometry", "readTextGeometry", ["document.bytes"], "document.regions", items);
-      return { regions: items, imagePath: null };
+      // In the same units as the boxes. A region a reader cannot place on the page is not
+      // evidence, and placing it needs the page's extent as well as the box.
+      return { regions: items, imagePath: null, page: { width, height } };
     }
 
     let imagePath = route.imagePath;
+    let page = {};
     if (route.kind !== "image") {
-      imagePath = (await raster.renderFirstPage(filePath, { outDir })).imagePath;
+      const rendered = await raster.renderFirstPage(filePath, { outDir });
+      imagePath = rendered.imagePath;
+      page = { width: rendered.width, height: rendered.height };
       note("render", "renderFirstPage", ["document.bytes"], "document.page", { rendered: true });
     }
 
     const { regions } = await readPage(imagePath, { audit });
     const joined = joinSplitNumbers(regions);
     note("recognise", "readPage", ["document.page"], "document.regions", joined);
-    return { regions: joined, imagePath };
+    return { regions: joined, imagePath, page };
   }
 
   return {
@@ -58,7 +63,7 @@ function createPipeline({ extractor, audit, raster, readPage = defaultReadPage,
       }
 
       const beforeRegions = performance.now();
-      const { regions, imagePath } = await regionsFor(route, filePath, note);
+      const { regions, imagePath, page } = await regionsFor(route, filePath, note);
       const regionsMs = Math.round(performance.now() - beforeRegions);
 
       const beforeExtract = performance.now();
@@ -93,6 +98,14 @@ function createPipeline({ extractor, audit, raster, readPage = defaultReadPage,
       return {
         route: route.kind,
         regions: regions.length,
+        // What was asked for, not only what came back. Without it a reader cannot tell a
+        // field that was never requested from one whose abstention was deleted.
+        declared: template.fields.map((f) => f.key),
+        page,
+        // Carried through so the certificate's descriptor names the model that ran rather
+        // than the one that happens to be the default for this route.
+        model: extracted.model,
+        quantisation: extracted.quantisation,
         raw: extracted.raw,
         rejected: extracted.rejected,
         identities: arithmetic.identities,
