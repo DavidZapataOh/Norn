@@ -31,7 +31,12 @@ function withSilenceWatchdog(silenceMs, start) {
 const DEFAULT_TEXT = "qwen3-4b";
 const DEFAULT_VISION = "qwen3vl-2b";
 
-function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 90_000 }) {
+// Recorded in the replay descriptor, so it has to be a value that was really sent rather than
+// an assumption that greedy decoding is deterministic.
+const DEFAULT_SEED = 4242;
+
+function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 90_000,
+                           seed = DEFAULT_SEED }) {
   const compiled = compile(template);
   const ask = instruction(template);
   let resident = null;
@@ -69,7 +74,7 @@ function createExtractor({ audit, sdk, template = DEFAULT_TEMPLATE, silenceMs = 
         // this one, which produces a plausible wrong answer rather than an error.
         kvCache: false,
         responseFormat: { type: "json_schema", json_schema: compiled },
-        generationParams: { predict: 600, temp: 0 },
+        generationParams: { predict: 600, temp: 0, seed },
       }, { model: entry.constName, event }));
     } catch (error) {
       // A throw that skips the unload leaves the model resident while the caller believes

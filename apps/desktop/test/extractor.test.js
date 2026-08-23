@@ -1,7 +1,7 @@
 "use strict";
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createExtractor } = require("../lib/extractor");
+const { createExtractor, DEFAULT_SEED } = require("../lib/extractor");
 
 const registry = {
   QWEN3_4B_INST_Q4_K_M: { src: "registry://s3/qwen3-4b.gguf", engine: "llamacpp-completion",
@@ -161,4 +161,28 @@ test("the watchdog does not fire on a slow but progressing load", async () => {
 
   await extractor.fromText("x");   // 150ms total, no stretch over 40ms
   await extractor.unload();
+});
+
+test("the extractor sends the seed it was given, and a default when it was not", async () => {
+  // temp: 0 alone is greedy decoding and very probably deterministic. A replay claim cannot
+  // rest on "very probably", and a descriptor naming a seed the extractor never received is
+  // worse than one naming none.
+  const withDefault = fakeAudit();
+  await createExtractor({ audit: withDefault, sdk, template }).fromText("x");
+
+  const withSeed = fakeAudit();
+  await createExtractor({ audit: withSeed, sdk, template, seed: 99 }).fromText("x");
+
+  assert.equal(withDefault.calls.completion[0].params.generationParams.seed, DEFAULT_SEED);
+  assert.equal(withSeed.calls.completion[0].params.generationParams.seed, 99);
+});
+
+test("the extractor shares no cache between runs", async () => {
+  // A shared cache makes a run depend on what ran before it, so replay would be a function of
+  // history rather than of inputs. This asserts existing behaviour rather than driving it out;
+  // it is kept because nothing else would notice the flag being removed.
+  const audit = fakeAudit();
+  await createExtractor({ audit, sdk, template }).fromText("x");
+
+  assert.equal(audit.calls.completion[0].params.kvCache, false);
 });

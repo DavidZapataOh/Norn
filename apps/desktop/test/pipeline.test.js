@@ -107,3 +107,78 @@ test("binding runs before arithmetic, so an unfound value cannot fail an identit
   assert.equal(out.fields.tax_rate.admitted, false);
   assert.equal(out.fields.tax_rate.check, "binding");
 });
+
+test("a run traces every stage it has, in the order it ran them", async () => {
+  // A trace that starts after the document was read cannot describe how the document was
+  // read, and routing decides which mechanism read it.
+  const d = doubles({ regions: [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }] });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "digital-continental.pdf"));
+
+  assert.deepEqual(out.trace.records.map((r) => r.stage),
+    ["route", "geometry", "extract", "bind", "arithmetic", "gate"]);
+  assert.equal(out.trace.root.length, 64);
+});
+
+test("the recognition path traces recognition where the text path traces geometry", async () => {
+  const d = doubles({ regions: [{ text: "3.014,30", bbox: [1, 1, 2, 2], confidence: 0.9 }] });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "photo-skewed.png"));
+
+  assert.deepEqual(out.trace.records.map((r) => r.stage),
+    ["route", "recognise", "extract", "bind", "arithmetic", "gate"]);
+});
+
+test("a scanned PDF traces the render it needed before recognising", async () => {
+  const d = doubles({ regions: [{ text: "3.014,30", bbox: [1, 1, 2, 2], confidence: 0.9 }] });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "scan-continental.pdf"));
+
+  assert.deepEqual(out.trace.records.map((r) => r.stage),
+    ["route", "render", "recognise", "extract", "bind", "arithmetic", "gate"]);
+});
+
+test("no trace record carries a figure", async () => {
+  // Enforced by the record shape, asserted here because this is the module that would be
+  // tempted: it has every value in hand at the moment it appends.
+  const d = doubles({ regions: [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }] });
+  const pipeline = createPipeline({ ...d, template });
+
+  const out = await pipeline.run(path.join(CORPUS, "digital-continental.pdf"));
+
+  for (const record of out.trace.records) {
+    assert.deepEqual(Object.keys(record).sort(),
+      ["action", "digest", "head", "reads", "stage", "writes"]);
+  }
+  assert.ok(!JSON.stringify(out.trace.records).includes("52381"),
+    "an amount reached the trace");
+});
+
+test("two runs of the same document produce the same trace root", async () => {
+  // The cheapest determinism check available, and the only one that runs without a model.
+  const regions = [{ text: "523,81", bbox: [1, 1, 2, 2], source: "text-layer" }];
+  const file = path.join(CORPUS, "digital-continental.pdf");
+
+  const first = await createPipeline({ ...doubles({ regions }), template }).run(file);
+  const second = await createPipeline({ ...doubles({ regions }), template }).run(file);
+
+  assert.equal(second.trace.root, first.trace.root);
+});
+
+test("a document read at a different confidence has a different trace root", async () => {
+  // The trace commits to what each stage produced. A page read at different confidences is a
+  // different reading of the page, and a root that could not tell them apart would be
+  // committing to nothing.
+  const file = path.join(CORPUS, "photo-skewed.png");
+  const at = (confidence) => createPipeline({
+    ...doubles({ regions: [{ text: "3.014,30", bbox: [1, 1, 2, 2], confidence }] }), template,
+  }).run(file);
+
+  const confident = await at(0.9);
+  const less = await at(0.7);
+
+  assert.notEqual(less.trace.root, confident.trace.root);
+});
