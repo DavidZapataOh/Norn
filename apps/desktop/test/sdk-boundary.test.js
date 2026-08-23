@@ -18,9 +18,15 @@ function sourceFiles(dir, found = []) {
   return found;
 }
 
+// Matches the ways a module can actually reach the package, rather than any mention
+// of its name: a user-facing message that quotes the package is not a second door.
+// A determined evasion (`const p = "@qvac/sdk"; await import(p)`) is out of scope; this
+// guards against drift, not an adversary.
+const REACHES_SDK = /(?:require|import)\s*\(\s*["']@qvac\/sdk["']\s*\)|from\s+["']@qvac\/sdk["']/;
+
 function filesNamingTheSdk() {
   return sourceFiles(APP_DIR)
-    .filter((file) => fs.readFileSync(file, "utf8").includes("@qvac/sdk"))
+    .filter((file) => REACHES_SDK.test(fs.readFileSync(file, "utf8")))
     .map((file) => path.relative(APP_DIR, file));
 }
 
